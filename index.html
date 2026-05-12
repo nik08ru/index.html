@@ -97,13 +97,8 @@
     }
 
     @media (max-width: 700px) {
-      .table-container {
-        border: none;
-        overflow-x: visible;
-      }
-      table, thead, tbody, th, td, tr {
-        display: block;
-      }
+      .table-container { border: none; overflow-x: visible; }
+      table, thead, tbody, th, td, tr { display: block; }
       thead { display: none; }
       table { min-width: 0; }
       tbody tr {
@@ -129,7 +124,6 @@
         margin-right: 10px;
         min-width: 90px;
       }
-      tbody td:last-child { justify-content: flex-start; }
     }
 
     @media (max-width: 400px) {
@@ -254,7 +248,7 @@
 </div>
 
 <script>
-  const API_URL = 'https://script.google.com/macros/s/AKfycbzqSquJory4Q5QPr7LcpvvzlearNfF_Rd4TVq1yEauWYIuta5BRdcipdB4m8czi_bRDeA/exec';
+  const API_URL = 'https://script.google.com/macros/s/AKfycbyJP1Merj9tcAgH0XZ3itr5eBfKnBN67tDQ6kFiKllSSzrtLIbKjKu6CiUERdBlXH32kw/exec';
 
   let allTrees = [];
   let currentUid = null;
@@ -357,20 +351,14 @@
     // Обновляем статус удаления
     try {
       const removeBody = new URLSearchParams({ action: 'updateRemove', uid: currentUid, remove: removeCheck.checked });
-      const removeResp = await fetch(API_URL, { method: 'POST', body: removeBody });
-      const removeResult = await removeResp.json();
-      if (removeResult.error) {
-        statusDiv.textContent = '❌ Ошибка статуса: ' + removeResult.error;
-        statusDiv.className = 'error';
-        return;
-      }
+      await fetch(API_URL, { method: 'POST', body: removeBody });
     } catch (err) {
-      statusDiv.textContent = '❌ Сетевая ошибка';
+      statusDiv.textContent = '❌ Ошибка статуса';
       statusDiv.className = 'error';
       return;
     }
 
-    // Загрузка фото
+    // Отправляем фото, если есть
     const formData = new FormData();
     formData.append('action', 'uploadPhotos');
     formData.append('uid', currentUid);
@@ -378,14 +366,17 @@
     for (let i = 1; i <= 4; i++) {
       const fileInput = document.getElementById('photo' + i);
       if (fileInput.files.length > 0) {
-        formData.append('photo' + (i-1), fileInput.files[0]);
+        formData.append(`photo${i-1}`, fileInput.files[0]); // имена photo0, photo1...
         hasFiles = true;
       }
     }
 
     if (hasFiles) {
       try {
-        const photoResp = await fetch(API_URL, { method: 'POST', body: formData });
+        const photoResp = await fetch(API_URL, {
+          method: 'POST',
+          body: formData
+        });
         const photoResult = await photoResp.json();
         if (photoResult.error) {
           statusDiv.textContent = '❌ Ошибка фото: ' + photoResult.error;
