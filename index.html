@@ -119,7 +119,7 @@
 </div>
 
 <script>
-  const API_URL = 'https://script.google.com/macros/s/AKfycbx1lCYt5tPNQ9zezjw7LExqpRVEutLWxUyKHs-HjWFJ3PXsjdyNsYSDDRG2jxE2Jj5Ndw/exec;
+  const API_URL = 'https://script.google.com/macros/s/AKfycbyfZ_fcuMuc6pRAWdEteJOA02MSXo83MfMYRgV_7YMbXvqQohtBqPjhbvi-cIfYANNHFA/exec';
 
   let addresses = [];
   let currentAddress = null;
@@ -290,7 +290,7 @@
         }
       } catch (err) {
         console.error('Ошибка загрузки фото:', err);
-        statusDiv.textContent = '❌ Ошибка сети при загрузке фото: ' + (err.message || 'неизвестно');
+        statusDiv.textContent = '❌ Ошибка сети при загрузке фото';
         statusDiv.className = 'error';
         return;
       }
