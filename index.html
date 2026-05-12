@@ -135,7 +135,7 @@
 
                 const dot = document.createElement('div');
                 dot.className = 'tree-marker';
-                dot.textContent = t.id ? t.id.slice(-3) : index+1; // последние 3 цифры ID
+                dot.textContent = t.numPlant || (t.id ? t.id.slice(-3) : index+1);
                 dot.style.left = px + 'px';
                 dot.style.top = py + 'px';
                 dot.dataset.uid = t.uid;
