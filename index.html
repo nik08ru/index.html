@@ -7,21 +7,18 @@
     <style>
         body { font-family: Arial, sans-serif; background: #f5f5f5; margin: 0; padding: 20px; }
         #plan-container { position: relative; display: inline-block; border: 2px solid #333; line-height: 0; }
-        #plan-img { max-width: 100%; height: auto; display: block; cursor: crosshair; }
+        #plan-img { max-width: 100%; height: auto; display: block; }
         .tree-marker {
-            position: absolute; width: 18px; height: 18px;
+            position: absolute; width: 20px; height: 20px;
             background: rgba(0, 128, 0, 0.85); border: 2px solid white;
             border-radius: 50%; transform: translate(-50%, -50%);
             cursor: pointer; z-index: 10; transition: 0.2s;
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-size: 10px; font-weight: bold;
+            user-select: none;
         }
-        .tree-marker:hover { background: red; width: 22px; height: 22px; }
+        .tree-marker.dragging { opacity: 0.7; background: orange; }
         .tree-marker.removed { background: rgba(255, 0, 0, 0.8); }
-        .calibration-point {
-            position: absolute; width: 14px; height: 14px;
-            background: red; border: 2px solid yellow;
-            border-radius: 50%; transform: translate(-50%, -50%);
-            cursor: pointer; z-index: 20;
-        }
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0;
             width: 100%; height: 100%; background: rgba(0,0,0,0.6); }
         .modal-content { background: white; margin: 3% auto; padding: 20px;
@@ -30,32 +27,22 @@
             font-weight: bold; cursor: pointer; }
         .tree-info p { margin: 5px 0; }
         .tree-info label { font-weight: bold; display: inline-block; width: 180px; }
-        .btn { background: #4CAF50; color: white; border: none; padding: 10px 20px;
+        .btn { background: #4CAF50; color: white; border: none; padding: 8px 16px;
             border-radius: 5px; cursor: pointer; margin: 5px; }
         .btn:hover { opacity: 0.9; }
         #photo-preview { max-width: 200px; max-height: 200px; margin-top: 10px; display: block; }
-        #calibration-panel { margin: 15px 0; padding: 10px; background: #eef; border-radius: 5px; display: inline-block; }
-        #calibration-panel label { font-weight: bold; }
-        #calibration-points-list { max-height: 150px; overflow-y: auto; margin: 10px 0; }
-        .point-entry { margin: 5px 0; }
+        #controls { margin: 15px 0; padding: 10px; background: #eef; border-radius: 5px; display: inline-block; }
+        #status { margin-left: 10px; color: green; }
     </style>
 </head>
 <body>
     <h2>План зелёных насаждений</h2>
-    <p>Нажмите на маркер, чтобы увидеть данные, отметить удаление или загрузить фото.</p>
-
-    <div id="calibration-panel">
-        <strong>Калибровка по опорным точкам</strong>
-        <p>Кликните на плане по известному растению, выберите его в списке и нажмите "Добавить точку". Добавьте 3–4 точки, затем вычислите преобразование.</p>
-        <select id="treeSelect">
-            <option value="">-- Выберите растение --</option>
-        </select>
-        <button class="btn" id="addPointBtn">Добавить точку</button>
-        <button class="btn" id="computeBtn">Вычислить и применить</button>
-        <button class="btn" id="saveCalibBtn" style="background:#2196F3;">Запомнить</button>
-        <span id="savedMsg" style="margin-left:10px; color:green;"></span>
-        <div id="calibration-points-list"></div>
-        <button class="btn" id="clearPointsBtn" style="background:#f44336;">Очистить точки</button>
+    <div id="controls">
+        <button class="btn" id="dragModeBtn">Включить перемещение</button>
+        <button class="btn" id="computeCalibBtn" disabled>Вычислить калибровку</button>
+        <button class="btn" id="saveCalibBtn" disabled>Сохранить калибровку</button>
+        <span id="status"></span>
+        <br><small>Для калибровки: включите режим, перетащите несколько маркеров в правильные места, затем нажмите "Вычислить"</small>
     </div>
 
     <div id="plan-container">
@@ -83,237 +70,45 @@
     <script src="trees.js"></script>
     <script>
         // ---------- НАСТРОЙКИ ----------
-        const API_URL = 'https://script.google.com/macros/s/AKfycby9TMK0ewD9-YXPthheFn26KmtISA08caEV68bx4-VNCNpN7roHAfwLCmJjDr9BEJ4cHg/exec'; // ★ замените на свой
+        const API_URL = 'ВАШ_API_URL'; // ★ замените на свой URL
 
-        // ---------- ДАННЫЕ ----------
+        // ---------- ПЕРЕМЕННЫЕ ----------
         const img = document.getElementById('plan-img');
         const container = document.getElementById('plan-container');
-        const treeSelect = document.getElementById('treeSelect');
-        const addPointBtn = document.getElementById('addPointBtn');
-        const computeBtn = document.getElementById('computeBtn');
+        const dragModeBtn = document.getElementById('dragModeBtn');
+        const computeCalibBtn = document.getElementById('computeCalibBtn');
         const saveCalibBtn = document.getElementById('saveCalibBtn');
-        const savedMsg = document.getElementById('savedMsg');
-        const pointsList = document.getElementById('calibration-points-list');
-        const clearPointsBtn = document.getElementById('clearPointsBtn');
+        const statusSpan = document.getElementById('status');
 
-        let calibrationPoints = []; // { x_pix, y_pix, x_raw, y_raw }
-        let transformMatrix = null; // коэффициенты a,b,c,d,e,f для x' = a*x + b*y + c, y' = d*x + e*y + f
+        let markers = [];              // DOM-элементы маркеров
+        let markerDataMap = new Map(); // DOM -> объект из treesRaw
+        let isDragMode = false;
+        let draggedMarker = null;
+        let dragOffsetX = 0, dragOffsetY = 0;
+        let calibratedTransform = null; // { offsetX, offsetY, scaleX, scaleY } или null
 
-        // Заполняем выпадающий список деревьями
-        function populateSelect() {
-            treesRaw.forEach(t => {
-                const option = document.createElement('option');
-                option.value = t.uid;
-                option.textContent = `ID ${t.id} (${t.x_raw.toFixed(1)}, ${t.y_raw.toFixed(1)})`;
-                treeSelect.appendChild(option);
-            });
-        }
-
-        // Отрисовка списка опорных точек
-        function renderPointsList() {
-            let html = '';
-            calibrationPoints.forEach((p, i) => {
-                const tree = treesRaw.find(t => t.uid == p.uid);
-                const name = tree ? `ID ${tree.id}` : '?';
-                html += `<div class="point-entry">${i+1}. Пикс: (${Math.round(p.x_pix)}, ${Math.round(p.y_pix)}) → ${name} (${p.x_raw.toFixed(1)}, ${p.y_raw.toFixed(1)}) 
-                    <button data-index="${i}" class="btn" style="background:orange; padding:2px 8px;">×</button></div>`;
-            });
-            pointsList.innerHTML = html;
-            document.querySelectorAll('.point-entry button').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const idx = parseInt(this.dataset.index);
-                    calibrationPoints.splice(idx, 1);
-                    renderPointsList();
-                    drawCalibrationPoints();
-                });
-            });
-        }
-
-        // Добавление новой опорной точки
-        function addCalibrationPoint(uid, x_pix, y_pix) {
-            const tree = treesRaw.find(t => t.uid == uid);
-            if (!tree) return alert('Выберите растение из списка!');
-            // Проверяем, нет ли уже этой точки
-            if (calibrationPoints.some(p => p.uid == uid)) {
-                alert('Это растение уже добавлено.');
-                return;
-            }
-            calibrationPoints.push({ uid, x_pix, y_pix, x_raw: tree.x_raw, y_raw: tree.y_raw });
-            renderPointsList();
-            drawCalibrationPoints();
-        }
-
-        // Отображение красных кружков опорных точек на плане
-        function drawCalibrationPoints() {
-            container.querySelectorAll('.calibration-point').forEach(el => el.remove());
-            calibrationPoints.forEach(p => {
-                const dot = document.createElement('div');
-                dot.className = 'calibration-point';
-                dot.style.left = p.x_pix + 'px';
-                dot.style.top = p.y_pix + 'px';
-                container.appendChild(dot);
-            });
-        }
-
-        // Решение системы линейных уравнений методом Гаусса (матрица n x (n+1))
-        function gauss(A) {
-            const n = A.length;
-            for (let i=0; i<n; i++) {
-                // Поиск максимума в столбце
-                let maxEl = Math.abs(A[i][i]), maxRow = i;
-                for (let k=i+1; k<n; k++) {
-                    if (Math.abs(A[k][i]) > maxEl) {
-                        maxEl = Math.abs(A[k][i]);
-                        maxRow = k;
-                    }
-                }
-                // Перестановка строк
-                [A[i], A[maxRow]] = [A[maxRow], A[i]];
-                // Нормализация
-                const div = A[i][i];
-                for (let j=i; j<=n; j++) A[i][j] /= div;
-                // Вычитание из остальных строк
-                for (let k=0; k<n; k++) {
-                    if (k === i) continue;
-                    const factor = A[k][i];
-                    for (let j=i; j<=n; j++) A[k][j] -= factor * A[i][j];
-                }
-            }
-            return A.map(row => row[n]);
-        }
-
-        // Вычисление аффинного преобразования по 3+ точкам (метод наименьших квадратов через псевдообратную матрицу)
-        function computeAffineTransform(points) {
-            // points: массив {x_raw, y_raw, x_pix, y_pix}
-            // Ищем матрицу 2x3: [a, b, c; d, e, f]
-            // Система: x_pix = a*x_raw + b*y_raw + c
-            //          y_pix = d*x_raw + e*y_raw + f
-            // Составляем матрицу M (2N x 6) и вектор RHS (2N)
-            const N = points.length;
-            let M = [], rhs = [];
-            for (let p of points) {
-                // первое уравнение
-                M.push([p.x_raw, p.y_raw, 1, 0, 0, 0]);
-                rhs.push(p.x_pix);
-                // второе уравнение
-                M.push([0, 0, 0, p.x_raw, p.y_raw, 1]);
-                rhs.push(p.y_pix);
-            }
-            // Решаем M^T * M * x = M^T * rhs
-            let MtM = Array(6).fill().map(() => Array(6).fill(0));
-            let Mtrhs = Array(6).fill(0);
-            for (let i = 0; i < 2*N; i++) {
-                for (let j = 0; j < 6; j++) {
-                    Mtrhs[j] += M[i][j] * rhs[i];
-                    for (let k = 0; k < 6; k++) {
-                        MtM[j][k] += M[i][j] * M[i][k];
-                    }
-                }
-            }
-            // Расширенная матрица 6x7
-            let aug = [];
-            for (let i=0; i<6; i++) {
-                aug.push([...MtM[i], Mtrhs[i]]);
-            }
-            const sol = gauss(aug);
-            return { a: sol[0], b: sol[1], c: sol[2], d: sol[3], e: sol[4], f: sol[5] };
-        }
-
-        // Применяем преобразование ко всем маркерам
-        function placeMarkersWithTransform(T) {
-            if (!treesRaw || treesRaw.length === 0) return;
-            const imgW = img.clientWidth;
-            const imgH = img.clientHeight;
-            if (imgW === 0 || imgH === 0) return;
-
-            container.querySelectorAll('.tree-marker').forEach(el => el.remove());
-
-            treesRaw.forEach(t => {
-                const px = T.a * t.x_raw + T.b * t.y_raw + T.c;
-                const py = T.d * t.x_raw + T.e * t.y_raw + T.f;
-
-                // Ограничиваем, чтобы не вылезало за границы контейнера
-                if (px < 0 || px > imgW || py < 0 || py > imgH) return;
-
-                const dot = document.createElement('div');
-                dot.className = 'tree-marker';
-                dot.style.left = px + 'px';
-                dot.style.top = py + 'px';
-                dot.dataset.uid = t.uid;
-                dot.addEventListener('click', () => openModal(t.uid));
-                container.appendChild(dot);
-            });
-        }
-
-        // Обработчики
-        addPointBtn.addEventListener('click', () => {
-            const uid = parseInt(treeSelect.value);
-            if (!uid) return alert('Выберите растение из списка.');
-            // Ждём клика по плану
-            alert('Теперь кликните по этому растению на плане.');
-            const handler = function(e) {
-                const rect = img.getBoundingClientRect();
-                const scaleX = img.clientWidth / rect.width;
-                const scaleY = img.clientHeight / rect.height;
-                const x_pix = (e.clientX - rect.left) * scaleX;
-                const y_pix = (e.clientY - rect.top) * scaleY;
-                addCalibrationPoint(uid, x_pix, y_pix);
-                img.removeEventListener('click', handler);
-            };
-            img.addEventListener('click', handler);
-        });
-
-        computeBtn.addEventListener('click', () => {
-            if (calibrationPoints.length < 3) {
-                return alert('Нужно минимум 3 опорные точки.');
-            }
-            const T = computeAffineTransform(calibrationPoints);
-            transformMatrix = T;
-            placeMarkersWithTransform(T);
-            // Очищаем опорные точки (опционально)
-            calibrationPoints = [];
-            renderPointsList();
-            container.querySelectorAll('.calibration-point').forEach(el => el.remove());
-            localStorage.setItem('treeTransform', JSON.stringify(T));
-        });
-
-        saveCalibBtn.addEventListener('click', () => {
-            if (transformMatrix) {
-                localStorage.setItem('treeTransform', JSON.stringify(transformMatrix));
-                savedMsg.textContent = 'Преобразование сохранено!';
-                setTimeout(() => savedMsg.textContent = '', 2000);
-            } else {
-                alert('Сначала вычислите преобразование.');
-            }
-        });
-
-        clearPointsBtn.addEventListener('click', () => {
-            calibrationPoints = [];
-            renderPointsList();
-            container.querySelectorAll('.calibration-point').forEach(el => el.remove());
-        });
-
-        // Попытка загрузить сохранённое преобразование
+        // Загружаем сохранённую калибровку
         try {
-            const savedT = localStorage.getItem('treeTransform');
-            if (savedT) {
-                transformMatrix = JSON.parse(savedT);
-                img.addEventListener('load', () => placeMarkersWithTransform(transformMatrix));
-                if (img.complete) placeMarkersWithTransform(transformMatrix);
-            } else {
-                // первичная расстановка без калибровки
-                img.addEventListener('load', placeMarkersSimple);
-                if (img.complete) placeMarkersSimple();
+            const saved = localStorage.getItem('treeCalibrationSimple');
+            if (saved) {
+                calibratedTransform = JSON.parse(saved);
+                statusSpan.textContent = 'Загружена сохранённая калибровка';
             }
         } catch(e) {}
 
-        function placeMarkersSimple() {
-            // простой вариант (как раньше) если нет сохранённого преобразования
+        // ---------- ФУНКЦИИ ----------
+        function placeMarkers() {
             if (!treesRaw || treesRaw.length === 0) return;
             const imgW = img.clientWidth;
             const imgH = img.clientHeight;
             if (imgW === 0 || imgH === 0) return;
+
+            // Очищаем старые маркеры
             container.querySelectorAll('.tree-marker').forEach(el => el.remove());
+            markers = [];
+            markerDataMap.clear();
+
+            // Вычисляем границы исходных координат
             let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
             treesRaw.forEach(t => {
                 if (t.x_raw < xMin) xMin = t.x_raw;
@@ -323,25 +118,253 @@
             });
             const dx = xMax - xMin;
             const dy = yMax - yMin;
-            treesRaw.forEach(t => {
+
+            treesRaw.forEach((t, index) => {
+                // Нормализованные координаты [0,1]
                 const nx = (t.x_raw - xMin) / dx;
                 const ny = (t.y_raw - yMin) / dy;
-                const px = nx * imgW;
-                const py = ny * imgH;
+
+                let px = nx * imgW;
+                let py = ny * imgH;
+
+                // Применяем калибровку, если есть
+                if (calibratedTransform) {
+                    px = nx * imgW * calibratedTransform.scaleX + calibratedTransform.offsetX;
+                    py = ny * imgH * calibratedTransform.scaleY + calibratedTransform.offsetY;
+                }
+
                 const dot = document.createElement('div');
                 dot.className = 'tree-marker';
+                dot.textContent = t.id ? t.id.slice(-3) : index+1; // последние 3 цифры ID
                 dot.style.left = px + 'px';
                 dot.style.top = py + 'px';
                 dot.dataset.uid = t.uid;
-                dot.addEventListener('click', () => openModal(t.uid));
+                dot.addEventListener('click', (e) => {
+                    if (!isDragMode) openModal(t.uid);
+                });
+                // drag events
+                dot.addEventListener('mousedown', onMouseDown);
+                dot.addEventListener('touchstart', onTouchStart, {passive: false});
                 container.appendChild(dot);
+                markers.push(dot);
+                markerDataMap.set(dot, t);
             });
         }
 
-        // ---------- ИНИЦИАЛИЗАЦИЯ ----------
-        populateSelect();
+        // ---------- DRAG AND DROP ----------
+        function onMouseDown(e) {
+            if (!isDragMode) return;
+            e.preventDefault();
+            draggedMarker = e.currentTarget;
+            draggedMarker.classList.add('dragging');
+            const rect = draggedMarker.getBoundingClientRect();
+            dragOffsetX = e.clientX - rect.left;
+            dragOffsetY = e.clientY - rect.top;
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        }
 
-        // Остальной код модального окна, обработки Remove и фото – без изменений
+        function onMouseMove(e) {
+            if (!draggedMarker) return;
+            const containerRect = container.getBoundingClientRect();
+            let x = e.clientX - containerRect.left - dragOffsetX + draggedMarker.offsetWidth/2;
+            let y = e.clientY - containerRect.top - dragOffsetY + draggedMarker.offsetHeight/2;
+            // ограничения
+            x = Math.max(0, Math.min(x, container.clientWidth - draggedMarker.offsetWidth));
+            y = Math.max(0, Math.min(y, container.clientHeight - draggedMarker.offsetHeight));
+            draggedMarker.style.left = x + 'px';
+            draggedMarker.style.top = y + 'px';
+        }
+
+        function onMouseUp(e) {
+            if (!draggedMarker) return;
+            draggedMarker.classList.remove('dragging');
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+            draggedMarker = null;
+            // Активируем кнопки
+            computeCalibBtn.disabled = false;
+            saveCalibBtn.disabled = true; // пока не вычислено
+        }
+
+        function onTouchStart(e) {
+            if (!isDragMode) return;
+            e.preventDefault();
+            const touch = e.touches[0];
+            draggedMarker = e.currentTarget;
+            draggedMarker.classList.add('dragging');
+            const rect = draggedMarker.getBoundingClientRect();
+            dragOffsetX = touch.clientX - rect.left;
+            dragOffsetY = touch.clientY - rect.top;
+            document.addEventListener('touchmove', onTouchMove, {passive: false});
+            document.addEventListener('touchend', onTouchEnd);
+        }
+
+        function onTouchMove(e) {
+            if (!draggedMarker) return;
+            e.preventDefault();
+            const touch = e.touches[0];
+            const containerRect = container.getBoundingClientRect();
+            let x = touch.clientX - containerRect.left - dragOffsetX + draggedMarker.offsetWidth/2;
+            let y = touch.clientY - containerRect.top - dragOffsetY + draggedMarker.offsetHeight/2;
+            x = Math.max(0, Math.min(x, container.clientWidth - draggedMarker.offsetWidth));
+            y = Math.max(0, Math.min(y, container.clientHeight - draggedMarker.offsetHeight));
+            draggedMarker.style.left = x + 'px';
+            draggedMarker.style.top = y + 'px';
+        }
+
+        function onTouchEnd(e) {
+            if (!draggedMarker) return;
+            draggedMarker.classList.remove('dragging');
+            document.removeEventListener('touchmove', onTouchMove);
+            document.removeEventListener('touchend', onTouchEnd);
+            draggedMarker = null;
+            computeCalibBtn.disabled = false;
+            saveCalibBtn.disabled = true;
+        }
+
+        // ---------- КАЛИБРОВКА ----------
+        function computeCalibration() {
+            // Собираем маркеры, которые были передвинуты (их текущее положение отличается от начального)
+            // Нам нужны хотя бы 2 точки для вычисления сдвига и масштаба
+            const movedMarkers = markers.filter(m => {
+                // Сравниваем с исходной позицией, которая была бы без калибровки
+                // Мы не хранили исходную, но можем восстановить из данных
+                const data = markerDataMap.get(m);
+                if (!data) return false;
+                // Исходная позиция без калибровки
+                const imgW = img.clientWidth;
+                const imgH = img.clientHeight;
+                const xMin = Math.min(...treesRaw.map(t=>t.x_raw));
+                const xMax = Math.max(...treesRaw.map(t=>t.x_raw));
+                const yMin = Math.min(...treesRaw.map(t=>t.y_raw));
+                const yMax = Math.max(...treesRaw.map(t=>t.y_raw));
+                const dx = xMax - xMin;
+                const dy = yMax - yMin;
+                const nx = (data.x_raw - xMin) / dx;
+                const ny = (data.y_raw - yMin) / dy;
+                const origX = nx * imgW;
+                const origY = ny * imgH;
+                const currX = parseFloat(m.style.left);
+                const currY = parseFloat(m.style.top);
+                // Если разница больше 2 пикселей, считаем передвинутым
+                return Math.abs(currX - origX) > 2 || Math.abs(currY - origY) > 2;
+            });
+
+            if (movedMarkers.length < 2) {
+                statusSpan.textContent = 'Нужно передвинуть минимум 2 маркера';
+                return;
+            }
+
+            // Для простоты предполагаем только сдвиг и равномерный масштаб
+            // Используем метод наименьших квадратов для преобразования: new_x = scale * orig_x + offset_x
+            // Для X и Y независимо
+            const points = movedMarkers.map(m => {
+                const data = markerDataMap.get(m);
+                const imgW = img.clientWidth;
+                const imgH = img.clientHeight;
+                const xMin = Math.min(...treesRaw.map(t=>t.x_raw));
+                const xMax = Math.max(...treesRaw.map(t=>t.x_raw));
+                const yMin = Math.min(...treesRaw.map(t=>t.y_raw));
+                const yMax = Math.max(...treesRaw.map(t=>t.y_raw));
+                const dx = xMax - xMin;
+                const dy = yMax - yMin;
+                const nx = (data.x_raw - xMin) / dx;
+                const ny = (data.y_raw - yMin) / dy;
+                const origX = nx * imgW;
+                const origY = ny * imgH;
+                const newX = parseFloat(m.style.left);
+                const newY = parseFloat(m.style.top);
+                return { origX, origY, newX, newY };
+            });
+
+            // Вычисляем scale и offset по X
+            let sumX = 0, sumOrigX = 0, sumXorigX = 0, sumOrigX2 = 0;
+            points.forEach(p => {
+                sumX += p.newX;
+                sumOrigX += p.origX;
+                sumXorigX += p.origX * p.newX;
+                sumOrigX2 += p.origX * p.origX;
+            });
+            const n = points.length;
+            const scaleX = (n * sumXorigX - sumOrigX * sumX) / (n * sumOrigX2 - sumOrigX * sumOrigX);
+            const offsetX = (sumX - scaleX * sumOrigX) / n;
+
+            // Для Y
+            let sumY = 0, sumOrigY = 0, sumYorigY = 0, sumOrigY2 = 0;
+            points.forEach(p => {
+                sumY += p.newY;
+                sumOrigY += p.origY;
+                sumYorigY += p.origY * p.newY;
+                sumOrigY2 += p.origY * p.origY;
+            });
+            const scaleY = (n * sumYorigY - sumOrigY * sumY) / (n * sumOrigY2 - sumOrigY * sumOrigY);
+            const offsetY = (sumY - scaleY * sumOrigY) / n;
+
+            calibratedTransform = {
+                scaleX: scaleX,
+                offsetX: offsetX,
+                scaleY: scaleY,
+                offsetY: offsetY
+            };
+
+            // Применяем ко всем маркерам
+            applyTransformToAll();
+            computeCalibBtn.disabled = true;
+            saveCalibBtn.disabled = false;
+            statusSpan.textContent = 'Калибровка вычислена и применена';
+        }
+
+        function applyTransformToAll() {
+            if (!calibratedTransform) return;
+            const imgW = img.clientWidth;
+            const imgH = img.clientHeight;
+            const xMin = Math.min(...treesRaw.map(t=>t.x_raw));
+            const xMax = Math.max(...treesRaw.map(t=>t.x_raw));
+            const yMin = Math.min(...treesRaw.map(t=>t.y_raw));
+            const yMax = Math.max(...treesRaw.map(t=>t.y_raw));
+            const dx = xMax - xMin;
+            const dy = yMax - yMin;
+
+            markers.forEach(m => {
+                const data = markerDataMap.get(m);
+                if (!data) return;
+                const nx = (data.x_raw - xMin) / dx;
+                const ny = (data.y_raw - yMin) / dy;
+                const origX = nx * imgW;
+                const origY = ny * imgH;
+                const newX = origX * calibratedTransform.scaleX + calibratedTransform.offsetX;
+                const newY = origY * calibratedTransform.scaleY + calibratedTransform.offsetY;
+                m.style.left = newX + 'px';
+                m.style.top = newY + 'px';
+            });
+        }
+
+        // Переключение режима
+        dragModeBtn.addEventListener('click', () => {
+            isDragMode = !isDragMode;
+            dragModeBtn.textContent = isDragMode ? 'Выключить перемещение' : 'Включить перемещение';
+            dragModeBtn.style.background = isDragMode ? '#f44336' : '#4CAF50';
+            // Меняем курсор
+            if (isDragMode) {
+                img.style.cursor = 'default';
+                markers.forEach(m => m.style.cursor = 'move');
+            } else {
+                img.style.cursor = 'crosshair';
+                markers.forEach(m => m.style.cursor = 'pointer');
+            }
+        });
+
+        computeCalibBtn.addEventListener('click', computeCalibration);
+        saveCalibBtn.addEventListener('click', () => {
+            if (calibratedTransform) {
+                localStorage.setItem('treeCalibrationSimple', JSON.stringify(calibratedTransform));
+                statusSpan.textContent = 'Калибровка сохранена в браузере';
+                saveCalibBtn.disabled = true;
+            }
+        });
+
+        // ---------- МОДАЛЬНОЕ ОКНО (без изменений) ----------
         const modal = document.getElementById('treeModal');
         const modalClose = document.getElementById('modalClose');
         const treeTitle = document.getElementById('treeTitle');
@@ -432,6 +455,11 @@
 
         modalClose.onclick = () => modal.style.display = 'none';
         window.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
+
+        // ---------- ЗАПУСК ----------
+        img.addEventListener('load', placeMarkers);
+        if (img.complete) placeMarkers();
+        window.addEventListener('resize', placeMarkers);
     </script>
 </body>
 </html>
