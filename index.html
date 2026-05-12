@@ -1,306 +1,194 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-  <title>Зелёные насаждения</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      background: #f0f4f0; padding: 12px; color: #1e293b;
+const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID'; // ID вашей таблицы
+const ADDRESSES = ['Адрес1', 'Адрес2', 'Адрес3']; // Точные имена листов-адресов
+const PHOTOS_FOLDER = 'SchoolTrees_Photos'; // Корневая папка на Диске
+
+const HEADERS = [
+  'UID', 'ID', 'Номер растения', 'Тип насаждения', 'Жизненная форма', 
+  'Вид растения', 'Количество', 'Диаметр', 'Высота', 'Возраст', 
+  'Состояние', 'Характеристика состояния', 'Рекомендации по уходу', 
+  'Особо ценное', 'Remove', 'PhotoURL1', 'PhotoURL2', 'PhotoURL3', 'PhotoURL4'
+];
+
+function doGet(e) {
+  try {
+    const action = e.parameter.action;
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    
+    if (action === 'addresses') {
+      return ContentService.createTextOutput(JSON.stringify({success: ADDRESSES})).setMimeType(ContentService.MimeType.JSON);
+    } else if (action === 'list') {
+      const address = e.parameter.address;
+      if (!ADDRESSES.includes(address)) throw new Error('Invalid address');
+      const data = getSheetData(ss.getSheetByName(address));
+      return ContentService.createTextOutput(JSON.stringify({success: data})).setMimeType(ContentService.MimeType.JSON);
+    } else if (action === 'tree') {
+      const address = e.parameter.address;
+      const uid = parseInt(e.parameter.uid);
+      if (!ADDRESSES.includes(address)) throw new Error('Invalid address');
+      const data = getSheetData(ss.getSheetByName(address));
+      const row = data.find(r => parseInt(r.UID) === uid);
+      return ContentService.createTextOutput(JSON.stringify({success: row || null})).setMimeType(ContentService.MimeType.JSON);
     }
-    .container {
-      max-width: 900px; margin: 0 auto; background: #fff;
-      border-radius: 20px; padding: 16px; box-shadow: 0 2px 10px rgba(0,0,0,.05);
-    }
-    header { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
-    h1 { font-size: 22px; font-weight: 700; }
-    .address-selector { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
-    .address-btn {
-      background: #e2e8f0; border: none; padding: 12px 20px; border-radius: 30px;
-      font-size: 16px; cursor: pointer; transition: 0.2s; font-weight: 500;
-    }
-    .address-btn.active { background: #2d6a4f; color: white; }
-    .search-wrapper { display: flex; align-items: center; background: #f1f5f9; border-radius: 30px; padding: 6px 16px; }
-    .search-wrapper input { border: none; outline: none; background: transparent; font-size: 16px; padding: 10px 0; width: 100%; }
-    .stats { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px; color: #475569; }
-
-    .table-container { overflow-x: auto; border-radius: 14px; border: 1px solid #e2e8f0; }
-    table { width: 100%; border-collapse: collapse; min-width: 650px; }
-    thead th { background: #2d6a4f; color: white; font-weight: 600; font-size: 14px; padding: 12px 10px; text-align: left; position: sticky; top: 0; }
-    tbody td { padding: 12px 10px; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
-    tbody tr { cursor: pointer; transition: background 0.15s; }
-    tbody tr:hover { background: #f0fdf4; }
-    tbody tr.removed { background: #fee2e2; }
-    .badge-removed { background: #dc2626; color: white; padding: 2px 10px; border-radius: 20px; font-size: 12px; }
-
-    @media (max-width: 700px) {
-      body { padding: 8px; }
-      .container { padding: 12px; }
-      .table-container { border: none; overflow-x: visible; }
-      table, thead, tbody, th, td, tr { display: block; }
-      thead { display: none; }
-      table { min-width: 0; }
-      tbody tr {
-        background: #fff; border: 1px solid #e2e8f0; border-radius: 14px;
-        margin-bottom: 10px; padding: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.04);
-      }
-      tbody td {
-        display: flex; justify-content: space-between; padding: 8px 10px;
-        border: none; font-size: 15px; line-height: 1.4;
-      }
-      tbody td::before {
-        content: attr(data-label); font-weight: 600; color: #475569; margin-right: 10px; min-width: 90px;
-      }
-      .address-selector { justify-content: center; }
-      .address-btn { font-size: 15px; padding: 10px 18px; }
-    }
-
-    @media (max-width: 400px) {
-      h1 { font-size: 20px; }
-    }
-
-    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,.6); backdrop-filter: blur(2px); }
-    .modal-content { background: white; margin: 5% auto; padding: 20px; width: 94%; max-width: 500px; border-radius: 20px; position: relative; max-height: 85vh; overflow-y: auto; }
-    .close { position: absolute; right: 16px; top: 12px; font-size: 28px; color: #666; cursor: pointer; }
-    .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 16px 0; }
-    .detail-item { background: #f8fafc; border-radius: 10px; padding: 10px; }
-    .detail-item label { font-size: 12px; color: #64748b; display: block; margin-bottom: 2px; }
-    .detail-item span { font-weight: 600; }
-    .photo-section { border-top: 2px solid #e2e8f0; padding-top: 16px; margin-top: 12px; }
-    .photo-section input[type="file"] { display: block; margin-bottom: 12px; padding: 10px; width: 100%; border: 1px dashed #cbd5e1; border-radius: 10px; background: #fafafa; font-size: 15px; }
-    .btn { background: #2d6a4f; color: white; border: none; padding: 14px 24px; border-radius: 40px; font-size: 16px; font-weight: 600; cursor: pointer; width: 100%; transition: 0.2s; }
-    .btn:hover { background: #1b4332; }
-    #status { margin-top: 10px; text-align: center; font-weight: 500; }
-    .error { color: #dc2626; }
-    .success { color: #2d6a4f; }
-  </style>
-</head>
-<body>
-<div class="container">
-  <header>
-    <h1>🌳 Зелёные насаждения</h1>
-    <div class="address-selector" id="addressSelector"></div>
-    <div class="search-wrapper"><input type="text" id="search" placeholder="Поиск..."></div>
-  </header>
-  <div class="stats">
-    <span>Адрес: <strong id="currentAddress"></strong></span>
-    <span>Всего: <strong id="totalCount">0</strong></span>
-    <span>На удаление: <strong id="removedCount">0</strong></span>
-  </div>
-  <div class="table-container">
-    <table>
-      <thead><tr><th>№</th><th>Вид</th><th>Диаметр</th><th>Высота</th><th>Состояние</th><th>Статус</th></tr></thead>
-      <tbody id="tableBody"></tbody>
-    </table>
-  </div>
-</div>
-
-<div id="treeModal" class="modal">
-  <div class="modal-content">
-    <span class="close" id="modalClose">&times;</span>
-    <h3 id="modalTitle"></h3>
-    <div id="treeDetails" class="detail-grid"></div>
-    <div style="margin:16px 0;display:flex;align-items:center;gap:8px;">
-      <input type="checkbox" id="removeCheck" style="width:22px;height:22px;">
-      <label for="removeCheck">Пометить на удаление</label>
-    </div>
-    <div class="photo-section">
-      <p><strong>📸 Фотографии (до 4)</strong></p>
-      <input type="file" accept="image/*" id="photo1">
-      <input type="file" accept="image/*" id="photo2">
-      <input type="file" accept="image/*" id="photo3">
-      <input type="file" accept="image/*" id="photo4">
-      <button class="btn" id="uploadBtn">Сохранить изменения</button>
-      <div id="status"></div>
-    </div>
-  </div>
-</div>
-
-<script>
-  const API_URL = 'https://script.google.com/macros/s/AKfycbygw1RGRh8LCtSfgYPRuir0VWMYg6n7sG1LA9mSXT8dvFDNBcY6_xcyNrS0wmysvEiBcA/exec';
-
-  let addresses = [];
-  let currentAddress = null;
-  let allTrees = [];
-  let currentUid = null;
-
-  const $ = id => document.getElementById(id);
-  const addressSelector = $('addressSelector');
-  const currentAddressSpan = $('currentAddress');
-  const tableBody = $('tableBody');
-  const searchInput = $('search');
-  const totalSpan = $('totalCount');
-  const removedSpan = $('removedCount');
-  const modal = $('treeModal');
-  const modalClose = $('modalClose');
-  const modalTitle = $('modalTitle');
-  const treeDetails = $('treeDetails');
-  const removeCheck = $('removeCheck');
-  const uploadBtn = $('uploadBtn');
-  const statusDiv = $('status');
-
-  async function loadAddresses() {
-    try {
-      const resp = await fetch(API_URL + '?action=addresses');
-      if (!resp.ok) throw new Error('HTTP ' + resp.status);
-      addresses = await resp.json();
-      if (addresses.length > 0) {
-        currentAddress = addresses[0];
-        buildAddressButtons();
-        await loadTrees();
-      }
-    } catch (err) {
-      console.error(err);
-      tableBody.innerHTML = '<tr><td colspan="6" class="error">Ошибка загрузки адресов</td></tr>';
-    }
+    throw new Error('Unknown action');
+  } catch (error) {
+    return ContentService.createTextOutput(JSON.stringify({error: error.toString()})).setMimeType(ContentService.MimeType.JSON);
   }
+}
 
-  function buildAddressButtons() {
-    addressSelector.innerHTML = '';
-    addresses.forEach(addr => {
-      const btn = document.createElement('button');
-      btn.className = 'address-btn' + (addr === currentAddress ? ' active' : '');
-      btn.textContent = addr;
-      btn.onclick = () => { currentAddress = addr; buildAddressButtons(); loadTrees(); };
-      addressSelector.appendChild(btn);
+function doPost(e) {
+  try {
+    const action = e.parameter.action;
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    
+    if (action === 'updateRemove') {
+      const address = e.parameter.address;
+      const uid = parseInt(e.parameter.uid);
+      const remove = e.parameter.remove === 'true';
+      if (!ADDRESSES.includes(address)) throw new Error('Invalid address');
+      updateRemove(ss.getSheetByName(address), uid, remove);
+      return ContentService.createTextOutput(JSON.stringify({success: true})).setMimeType(ContentService.MimeType.JSON);
+    } else if (action === 'uploadPhotos') {
+      const address = e.parameter.address;
+      const numStr = e.parameter.numPlant;
+      const uid = parseInt(e.parameter.uid);
+      if (!ADDRESSES.includes(address)) throw new Error('Invalid address');
+      
+      const sheet = ss.getSheetByName(address);
+      const folder = getOrCreatePhotosFolder(address, numStr, uid);
+      const urls = uploadPhotos(e, folder);
+      
+      updatePhotoUrls(sheet, uid, urls);
+      return ContentService.createTextOutput(JSON.stringify({success: urls})).setMimeType(ContentService.MimeType.JSON);
+    }
+    throw new Error('Unknown action');
+  } catch (error) {
+    return ContentService.createTextOutput(JSON.stringify({error: error.toString()})).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function getSheetData(sheet) {
+  ensureHeaders(sheet);
+  const range = sheet.getDataRange();
+  const values = range.getValues();
+  const data = [];
+  for (let i = 1; i < values.length; i++) {
+    const row = {};
+    HEADERS.forEach((header, col) => {
+      row[header] = values[i][col] || '';
     });
-    currentAddressSpan.textContent = currentAddress || '';
+    data.push(row);
   }
+  // Сортировка по номеру растения как число
+  data.sort((a, b) => parseFloat(a['Номер растения']) - parseFloat(b['Номер растения']));
+  return data;
+}
 
-  async function loadTrees() {
-    try {
-      const url = `${API_URL}?action=list&address=${encodeURIComponent(currentAddress)}`;
-      const resp = await fetch(url);
-      if (!resp.ok) throw new Error('HTTP ' + resp.status);
-      const data = await resp.json();
-      allTrees = Array.isArray(data) ? data.sort((a, b) => (parseInt(a['Номер растения'])||0) - (parseInt(b['Номер растения'])||0)) : [];
-      updateStats(allTrees);
-      renderTable(allTrees);
-    } catch (err) {
-      console.error(err);
-      tableBody.innerHTML = '<tr><td colspan="6" class="error">Ошибка загрузки данных</td></tr>';
-    }
+function ensureHeaders(sheet) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow === 0) {
+    sheet.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
+    return;
   }
-
-  function renderTable(rows) {
-    tableBody.innerHTML = '';
-    if (!rows.length) { tableBody.innerHTML = '<tr><td colspan="6">Нет данных</td></tr>'; return; }
-    rows.forEach(tree => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td data-label="№ растения"><strong>${tree['Номер растения'] || ''}</strong></td>
-        <td data-label="Вид">${tree['Вид растения'] || ''}</td>
-        <td data-label="Диаметр">${tree['Диаметр'] || ''}</td>
-        <td data-label="Высота">${tree['Высота'] || ''}</td>
-        <td data-label="Состояние">${tree['Состояние'] || ''}</td>
-        <td data-label="Статус">${(tree.Remove === true || tree.Remove === 'TRUE') ? '<span class="badge-removed">Удалить</span>' : ''}</td>
-      `;
-      tr.addEventListener('click', () => openModal(tree));
-      if (tree.Remove === true || tree.Remove === 'TRUE') tr.classList.add('removed');
-      tableBody.appendChild(tr);
-    });
-  }
-
-  function updateStats(rows) {
-    totalSpan.textContent = rows.length;
-    removedSpan.textContent = rows.filter(r => r.Remove === true || r.Remove === 'TRUE').length;
-  }
-
-  searchInput.addEventListener('input', () => {
-    const q = searchInput.value.toLowerCase().trim();
-    const filtered = q ? allTrees.filter(tree =>
-      ['Номер растения','Вид растения','Состояние','Характеристика состояния','Рекомендации по уходу']
-        .some(f => (tree[f] || '').toString().toLowerCase().includes(q))
-    ) : [...allTrees];
-    renderTable(filtered);
-    updateStats(filtered);
-  });
-
-  function openModal(tree) {
-    currentUid = tree.UID;
-    modalTitle.textContent = `${tree['Вид растения'] || 'Растение'} №${tree['Номер растения'] || ''}`;
-    treeDetails.innerHTML = `
-      <div class="detail-item"><label>Вид</label><span>${tree['Вид растения'] || '-'}</span></div>
-      <div class="detail-item"><label>Форма</label><span>${tree['Жизненная форма'] || '-'}</span></div>
-      <div class="detail-item"><label>Диаметр</label><span>${tree['Диаметр'] || '-'} см</span></div>
-      <div class="detail-item"><label>Высота</label><span>${tree['Высота'] || '-'} м</span></div>
-      <div class="detail-item"><label>Возраст</label><span>${tree['Возраст'] || '-'} лет</span></div>
-      <div class="detail-item"><label>Состояние</label><span>${tree['Состояние'] || '-'}</span></div>
-      <div class="detail-item" style="grid-column: span 2;"><label>Описание</label><span>${tree['Характеристика состояния'] || '-'}</span></div>
-      <div class="detail-item" style="grid-column: span 2;"><label>Рекомендации</label><span>${tree['Рекомендации по уходу'] || '-'}</span></div>
-    `;
-    removeCheck.checked = (tree.Remove === true || tree.Remove === 'TRUE');
-    $('photo1').value = ''; $('photo2').value = ''; $('photo3').value = ''; $('photo4').value = '';
-    statusDiv.textContent = '';
-    modal.style.display = 'block';
-  }
-
-  modalClose.onclick = () => modal.style.display = 'none';
-  window.onclick = e => { if (e.target === modal) modal.style.display = 'none'; };
-
-  uploadBtn.addEventListener('click', async () => {
-    if (!currentUid) return;
-    statusDiv.textContent = '⏳ Сохраняем...';
-    statusDiv.className = '';
-
-    // 1. Обновление статуса удаления
-    try {
-      const params = new URLSearchParams({ action: 'updateRemove', address: currentAddress, uid: currentUid, remove: removeCheck.checked });
-      const resp = await fetch(API_URL, { method: 'POST', body: params });
-      const result = await resp.json();
-      if (result.error) {
-        statusDiv.textContent = '❌ Ошибка статуса: ' + result.error;
-        statusDiv.className = 'error';
-        return;
-      }
-    } catch (err) {
-      statusDiv.textContent = '❌ Сетевая ошибка (статус)';
-      statusDiv.className = 'error';
-      return;
-    }
-
-    // 2. Загрузка фото через FormData
-    const fileInputs = ['photo1','photo2','photo3','photo4'].map(id => $(id));
-    const files = fileInputs.filter(inp => inp.files.length > 0).map(inp => inp.files[0]);
-
-    if (files.length > 0) {
-      const formData = new FormData();
-      files.forEach((file, idx) => {
-        formData.append('photo' + idx, file, file.name);
-      });
-      formData.append('action', 'uploadPhotos');
-      formData.append('address', currentAddress);
-      formData.append('uid', currentUid);
-
-      try {
-        const response = await fetch(API_URL, {
-          method: 'POST',
-          body: formData
-        });
-        const result = await response.json();
-        console.log('Ответ сервера (фото):', result);
-        if (result.error) {
-          statusDiv.textContent = '❌ Ошибка фото: ' + result.error;
-          statusDiv.className = 'error';
-          return;
-        }
-      } catch (err) {
-        console.error('Ошибка загрузки фото:', err);
-        statusDiv.textContent = '❌ Ошибка сети при загрузке фото';
-        statusDiv.className = 'error';
-        return;
+  
+  const headerRow = sheet.getRange(1, 1, 1, HEADERS.length).getValues()[0];
+  const missing = HEADERS.filter(h => !headerRow.includes(h));
+  
+  if (missing.length > 0 || headerRow[0] !== 'UID') {
+    // Пересоздаем заголовки и нормализуем данные
+    const dataRange = sheet.getDataRange();
+    const allValues = dataRange.getValues();
+    
+    // Удаляем служебные строки (первые 5 или содержащие ${})
+    let startRow = 1;
+    for (let i = 0; i < Math.min(5, allValues.length); i++) {
+      if (String(allValues[i][0]).includes('${')) {
+        startRow = i + 1;
+        break;
       }
     }
+    
+    const cleanData = allValues.slice(startRow);
+    
+    // Создаем новую таблицу
+    sheet.clear();
+    sheet.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
+    
+    // Маппинг старых колонок (предполагаем: ID в кол0 после служебных, Номер растения кол1 и т.д.)
+    // Адаптируйте под вашу структуру Excel
+    const newData = [];
+    for (let i = 0; i < cleanData.length; i++) {
+      const row = new Array(HEADERS.length).fill('');
+      row[0] = i + 1; // UID
+      row[1] = cleanData[i][0] || ''; // ID
+      row[2] = cleanData[i][1] || ''; // Номер растения
+      // Заполните остальные по вашей структуре: row[3] = Тип..., etc.
+      // Для примера оставляем пустыми
+      newData.push(row);
+    }
+    
+    if (newData.length > 0) {
+      sheet.getRange(2, 1, newData.length, HEADERS.length).setValues(newData);
+    }
+  }
+}
 
-    statusDiv.textContent = '✅ Сохранено!';
-    statusDiv.className = 'success';
-    await loadTrees();
-    setTimeout(() => { statusDiv.textContent = ''; statusDiv.className = ''; }, 2000);
+function updateRemove(sheet, uid, remove) {
+  ensureHeaders(sheet);
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (parseInt(data[i][0]) === uid) {
+      sheet.getRange(i + 1, HEADERS.indexOf('Remove') + 1).setValue(remove);
+      break;
+    }
+  }
+}
+
+function getOrCreatePhotosFolder(address, numPlant, uid) {
+  let root = getOrCreateFolder(PHOTOS_FOLDER);
+  let addrFolder = root.getFoldersByName(address).next() || root.createFolder(address);
+  let plantFolder = addrFolder.getFoldersByName(`${numPlant}_${uid}`).next() || 
+                    addrFolder.createFolder(`${numPlant}_${uid}`);
+  return plantFolder;
+}
+
+function getOrCreateFolder(name) {
+  const folders = DriveApp.getFoldersByName(name);
+  return folders.hasNext() ? folders.next() : DriveApp.createFolder(name);
+}
+
+function uploadPhotos(e, folder) {
+  const urls = ['', '', '', ''];
+  for (let i = 0; i < 4; i++) {
+    const key = `photo${i}`;
+    if (e.parameters[key] && e.parameters[key][0]) {
+      const blob = Utilities.newBlob(Utilities.base64Decode(e.parameters[key][0].split(',')[1]), 
+                                   'image/jpeg', `photo${i}.jpg`);
+      const file = folder.createFile(blob);
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      urls[i] = `https://drive.google.com/uc?export=view&id=${file.getId()}`;
+    }
+  }
+  return urls;
+}
+
+function updatePhotoUrls(sheet, uid, urls) {
+  ensureHeaders(sheet);
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (parseInt(data[i][0]) === uid) {
+      for (let j = 0; j < 4; j++) {
+        const col = HEADERS.indexOf(`PhotoURL${j+1}`) + 1;
+        sheet.getRange(i + 1, col).setValue(urls[j]);
+      }
+      break;
+    }
+  }
+}
+
+function fixAllAddressSheets() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  ADDRESSES.forEach(address => {
+    const sheet = ss.getSheetByName(address);
+    if (sheet) ensureHeaders(sheet);
   });
-
-  loadAddresses();
-</script>
-</body>
-</html>
+}
