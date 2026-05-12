@@ -3,199 +3,403 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Ведомость зелёных насаждений</title>
+  <title>Ведомость зелёных насаждений — Красная Пахра</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; background: #f9f9f9; }
-    h2 { color: #2c3e50; }
-    #search { margin: 10px 0; padding: 8px; width: 300px; font-size: 16px; }
-    #table-container { max-height: 70vh; overflow-y: auto; border: 1px solid #ccc; margin-top: 10px; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
-    th { background: #4CAF50; color: white; position: sticky; top: 0; }
-    tr { cursor: pointer; }
-    tr:hover { background: #f1f1f1; }
-    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.6); }
-    .modal-content { background: white; margin: 3% auto; padding: 20px; width: 90%; max-width: 500px;
-      border-radius: 8px; position: relative; }
-    .close { position: absolute; right: 15px; top: 10px; font-size: 28px; font-weight: bold; cursor: pointer; }
-    .detail-row { margin: 5px 0; }
-    .detail-row label { font-weight: bold; display: inline-block; width: 180px; }
-    .photo-section { margin-top: 15px; }
-    .photo-section input[type="file"] { margin: 5px 0; }
-    .btn { background: #4CAF50; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
-    .btn:hover { opacity: 0.9; }
-    #status { margin-top: 10px; }
-    .removed-row { background: #ffdddd; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(135deg, #eef2f3 0%, #d9e6d8 100%);
+      min-height: 100vh;
+      padding: 24px 16px;
+      color: #2c3e50;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: rgba(255,255,255,0.85);
+      backdrop-filter: blur(16px);
+      border-radius: 24px;
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+      padding: 32px;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 24px;
+    }
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #2e7d32, #1b5e20);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .search-wrapper {
+      display: flex;
+      align-items: center;
+      background: white;
+      border-radius: 50px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      padding: 0 20px;
+    }
+    .search-wrapper input {
+      border: none;
+      outline: none;
+      font-size: 16px;
+      padding: 14px 0;
+      width: 260px;
+      background: transparent;
+    }
+    .search-wrapper svg {
+      margin-right: 10px;
+      opacity: 0.4;
+    }
+    .stats {
+      display: flex;
+      gap: 24px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      color: #555;
+    }
+    .stats span {
+      background: white;
+      padding: 6px 16px;
+      border-radius: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+    .table-container {
+      overflow-x: auto;
+      border-radius: 16px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+      background: white;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 700px;
+    }
+    thead th {
+      background: #2e7d32;
+      color: white;
+      font-weight: 600;
+      font-size: 15px;
+      padding: 16px 20px;
+      text-align: left;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+    tbody td {
+      padding: 14px 20px;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 14px;
+    }
+    tbody tr {
+      transition: all 0.15s ease;
+      cursor: pointer;
+    }
+    tbody tr:hover {
+      background: #f1f8e9;
+      transform: scale(1.002);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    }
+    tbody tr.removed {
+      background: #ffebee;
+      opacity: 0.9;
+    }
+    tbody tr.removed:hover {
+      background: #fce4ec;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-weight: 500;
+      font-size: 13px;
+    }
+    .badge-removed {
+      background: #ef5350;
+      color: white;
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0; top: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(4px);
+    }
+    .modal-content {
+      background: white;
+      margin: 3% auto;
+      padding: 30px;
+      width: 90%;
+      max-width: 560px;
+      border-radius: 20px;
+      position: relative;
+      box-shadow: 0 30px 50px rgba(0,0,0,0.3);
+    }
+    .close {
+      position: absolute;
+      right: 20px;
+      top: 16px;
+      font-size: 32px;
+      font-weight: 300;
+      color: #888;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .close:hover { color: #000; }
+    .detail-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 20px 0;
+    }
+    .detail-item {
+      background: #f9fafb;
+      border-radius: 12px;
+      padding: 12px;
+    }
+    .detail-item label {
+      display: block;
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 4px;
+    }
+    .detail-item span {
+      font-weight: 600;
+      font-size: 16px;
+    }
+    .photo-section {
+      margin-top: 20px;
+      border-top: 2px solid #e0e0e0;
+      padding-top: 20px;
+    }
+    .photo-section input[type="file"] {
+      margin-bottom: 12px;
+      display: block;
+      width: 100%;
+      padding: 8px;
+      border: 1px dashed #ccc;
+      border-radius: 8px;
+      background: #fafafa;
+    }
+    .btn {
+      background: #2e7d32;
+      color: white;
+      border: none;
+      padding: 14px 28px;
+      border-radius: 40px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn:hover { background: #1b5e20; }
+    #status {
+      margin-top: 12px;
+      font-weight: 500;
+      color: #2e7d32;
+    }
   </style>
 </head>
 <body>
-  <h2>🌳 Ведомость зелёных насаждений (Красная Пахра)</h2>
-  <input type="text" id="search" placeholder="Поиск по виду, номеру, состоянию...">
-  <div id="table-container">
-    <table id="treeTable">
+<div class="container">
+  <header>
+    <h1>
+      <span>🌳</span> Зелёные насаждения<br><small style="font-size:16px;opacity:0.7;">Красная Пахра</small>
+    </h1>
+    <div class="search-wrapper">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="#888"><circle cx="10.5" cy="10.5" r="6.5"/><line x1="15.5" y1="15.5" x2="21" y2="21" stroke="#888" stroke-width="2"/></svg>
+      <input type="text" id="search" placeholder="Поиск по виду, номеру или состоянию...">
+    </div>
+  </header>
+  <div class="stats">
+    <span>Всего растений: <strong id="totalCount">0</strong></span>
+    <span>Помечено на удаление: <strong id="removedCount">0</strong></span>
+  </div>
+  <div class="table-container">
+    <table>
       <thead>
         <tr>
           <th>№ растения</th>
           <th>Вид</th>
-          <th>Диаметр</th>
-          <th>Высота</th>
+          <th>Диаметр, см</th>
+          <th>Высота, м</th>
           <th>Состояние</th>
-          <th>Удаление</th>
+          <th>Статус</th>
         </tr>
       </thead>
       <tbody id="tableBody"></tbody>
     </table>
   </div>
+</div>
 
-  <!-- Модальное окно -->
-  <div id="treeModal" class="modal">
-    <div class="modal-content">
-      <span class="close" id="modalClose">&times;</span>
-      <h3 id="modalTitle"></h3>
-      <div id="treeDetails"></div>
-      <div style="margin: 15px 0;">
-        <input type="checkbox" id="removeCheck"> <label for="removeCheck">Пометить на удаление</label>
-      </div>
-      <div class="photo-section">
-        <p><strong>Загрузить фотографии (до 4)</strong></p>
-        <input type="file" accept="image/*" capture="environment" id="photo1"><br>
-        <input type="file" accept="image/*" capture="environment" id="photo2"><br>
-        <input type="file" accept="image/*" capture="environment" id="photo3"><br>
-        <input type="file" accept="image/*" capture="environment" id="photo4"><br>
-        <button class="btn" id="uploadBtn">Сохранить изменения</button>
-      </div>
+<!-- Модальное окно -->
+<div id="treeModal" class="modal">
+  <div class="modal-content">
+    <span class="close" id="modalClose">&times;</span>
+    <h3 id="modalTitle" style="font-size:22px; margin-bottom:8px;"></h3>
+    <div id="treeDetails" class="detail-grid"></div>
+    <div style="margin: 20px 0; display: flex; align-items: center; gap: 10px;">
+      <input type="checkbox" id="removeCheck" style="width:20px; height:20px;">
+      <label for="removeCheck" style="font-weight:500;">Пометить на удаление</label>
+    </div>
+    <div class="photo-section">
+      <p><strong>📸 Загрузить фотографии (до 4)</strong></p>
+      <input type="file" accept="image/*" capture="environment" id="photo1" placeholder="Фото 1">
+      <input type="file" accept="image/*" capture="environment" id="photo2" placeholder="Фото 2">
+      <input type="file" accept="image/*" capture="environment" id="photo3" placeholder="Фото 3">
+      <input type="file" accept="image/*" capture="environment" id="photo4" placeholder="Фото 4">
+      <button class="btn" id="uploadBtn"><span>💾</span> Сохранить изменения</button>
       <div id="status"></div>
     </div>
   </div>
+</div>
 
-  <script>
-    const API_URL = 'https://script.google.com/macros/s/AKfycbx26lgGuN4C804XpnuStcjrsP4-u5ej4jgjzFUNTTZGXKeWh8btdsLSLOJWnwGCfsrS2w/exec'; // ← замените на свой URL Apps Script
+<script>
+  const API_URL = 'ВАШ_URL_ВЕБ_ПРИЛОЖЕНИЯ'; // ← замените на свой
 
-    let trees = [];
-    let currentUid = null;
+  let allTrees = [];
+  let currentUid = null;
 
-    const tableBody = document.getElementById('tableBody');
-    const searchInput = document.getElementById('search');
-    const modal = document.getElementById('treeModal');
-    const modalClose = document.getElementById('modalClose');
-    const modalTitle = document.getElementById('modalTitle');
-    const treeDetails = document.getElementById('treeDetails');
-    const removeCheck = document.getElementById('removeCheck');
-    const uploadBtn = document.getElementById('uploadBtn');
-    const statusDiv = document.getElementById('status');
+  const tableBody = document.getElementById('tableBody');
+  const searchInput = document.getElementById('search');
+  const totalSpan = document.getElementById('totalCount');
+  const removedSpan = document.getElementById('removedCount');
+  const modal = document.getElementById('treeModal');
+  const modalClose = document.getElementById('modalClose');
+  const modalTitle = document.getElementById('modalTitle');
+  const treeDetails = document.getElementById('treeDetails');
+  const removeCheck = document.getElementById('removeCheck');
+  const uploadBtn = document.getElementById('uploadBtn');
+  const statusDiv = document.getElementById('status');
 
-    // Загрузка данных
-    async function loadTrees() {
-      try {
-        const resp = await fetch(API_URL + '?action=list');
-        trees = await resp.json();
-        renderTable(trees);
-      } catch (err) {
-        tableBody.innerHTML = '<tr><td colspan="6">Ошибка загрузки данных</td></tr>';
-        console.error(err);
-      }
+  // Загрузка и сортировка
+  async function loadTrees() {
+    try {
+      const resp = await fetch(API_URL + '?action=list');
+      const data = await resp.json();
+      // Сортировка по номеру растения (числовое сравнение)
+      allTrees = Array.isArray(data) ? data.sort((a, b) => {
+        const na = parseInt(a['Номер растения']) || 0;
+        const nb = parseInt(b['Номер растения']) || 0;
+        return na - nb;
+      }) : [];
+      updateStats(allTrees);
+      renderTable(allTrees);
+    } catch (err) {
+      tableBody.innerHTML = '<tr><td colspan="6" style="padding:20px;text-align:center;color:red;">Ошибка загрузки данных</td></tr>';
+      console.error(err);
     }
+  }
 
-    function renderTable(data) {
-      tableBody.innerHTML = '';
-      if (!Array.isArray(data) || data.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="6">Нет данных</td></tr>';
-        return;
-      }
-      data.forEach(tree => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${tree['Номер растения'] || ''}</td>
-          <td>${tree['Вид растения'] || ''}</td>
-          <td>${tree['Диаметр'] || ''}</td>
-          <td>${tree['Высота'] || ''}</td>
-          <td>${tree['Состояние'] || ''}</td>
-          <td>${tree['Remove'] === true || tree['Remove'] === 'TRUE' ? '✔️' : ''}</td>
-        `;
-        tr.addEventListener('click', () => openModal(tree));
-        if (tree['Remove'] === true || tree['Remove'] === 'TRUE') {
-          tr.classList.add('removed-row');
-        }
-        tableBody.appendChild(tr);
-      });
+  function renderTable(rows) {
+    tableBody.innerHTML = '';
+    if (!rows.length) {
+      tableBody.innerHTML = '<tr><td colspan="6" style="padding:20px;text-align:center;">Нет данных</td></tr>';
+      return;
     }
-
-    // Поиск
-    searchInput.addEventListener('input', () => {
-      const query = searchInput.value.toLowerCase();
-      const filtered = trees.filter(tree => {
-        const fields = [tree['Номер растения'], tree['Вид растения'], tree['Состояние'], tree['Характеристика состояния'], tree['Рекомендации по уходу']];
-        return fields.some(f => (f || '').toString().toLowerCase().includes(query));
-      });
-      renderTable(filtered);
-    });
-
-    // Модальное окно
-    function openModal(tree) {
-      currentUid = tree.UID;
-      modalTitle.textContent = `${tree['Вид растения'] || 'Растение'} №${tree['Номер растения'] || ''}`;
-      treeDetails.innerHTML = `
-        <div class="detail-row"><label>Вид:</label> ${tree['Вид растения'] || '-'}</div>
-        <div class="detail-row"><label>Форма:</label> ${tree['Жизненная форма'] || '-'}</div>
-        <div class="detail-row"><label>Диаметр:</label> ${tree['Диаметр'] || '-'} см</div>
-        <div class="detail-row"><label>Высота:</label> ${tree['Высота'] || '-'} м</div>
-        <div class="detail-row"><label>Возраст:</label> ${tree['Возраст'] || '-'} лет</div>
-        <div class="detail-row"><label>Состояние:</label> ${tree['Состояние'] || '-'}</div>
-        <div class="detail-row"><label>Описание:</label> ${tree['Характеристика состояния'] || '-'}</div>
-        <div class="detail-row"><label>Рекомендации:</label> ${tree['Рекомендации по уходу'] || '-'}</div>
+    rows.forEach(tree => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><strong>${tree['Номер растения'] ?? ''}</strong></td>
+        <td>${tree['Вид растения'] ?? ''}</td>
+        <td>${tree['Диаметр'] ?? ''}</td>
+        <td>${tree['Высота'] ?? ''}</td>
+        <td>${tree['Состояние'] ?? ''}</td>
+        <td>${(tree.Remove === true || tree.Remove === 'TRUE') ? '<span class="badge badge-removed">Удалить</span>' : ''}</td>
       `;
-      removeCheck.checked = (tree.Remove === true || tree.Remove === 'TRUE');
-      // Очищаем поля файлов
-      document.getElementById('photo1').value = '';
-      document.getElementById('photo2').value = '';
-      document.getElementById('photo3').value = '';
-      document.getElementById('photo4').value = '';
-      statusDiv.textContent = '';
-      modal.style.display = 'block';
+      tr.addEventListener('click', () => openModal(tree));
+      if (tree.Remove === true || tree.Remove === 'TRUE') {
+        tr.classList.add('removed');
+      }
+      tableBody.appendChild(tr);
+    });
+  }
+
+  function updateStats(rows) {
+    totalSpan.textContent = rows.length;
+    const removed = rows.filter(r => r.Remove === true || r.Remove === 'TRUE').length;
+    removedSpan.textContent = removed;
+  }
+
+  // Поиск с сохранением сортировки
+  searchInput.addEventListener('input', () => {
+    const query = searchInput.value.toLowerCase().trim();
+    const filtered = query ? allTrees.filter(tree => {
+      return ['Номер растения','Вид растения','Состояние','Характеристика состояния','Рекомендации по уходу']
+        .some(f => (tree[f] || '').toString().toLowerCase().includes(query));
+    }) : [...allTrees];
+    renderTable(filtered);
+    updateStats(filtered);
+  });
+
+  // Модальное окно
+  function openModal(tree) {
+    currentUid = tree.UID;
+    modalTitle.textContent = `${tree['Вид растения'] || 'Растение'} №${tree['Номер растения'] || ''}`;
+    treeDetails.innerHTML = `
+      <div class="detail-item"><label>Вид</label><span>${tree['Вид растения'] || '-'}</span></div>
+      <div class="detail-item"><label>Жизненная форма</label><span>${tree['Жизненная форма'] || '-'}</span></div>
+      <div class="detail-item"><label>Диаметр</label><span>${tree['Диаметр'] || '-'} см</span></div>
+      <div class="detail-item"><label>Высота</label><span>${tree['Высота'] || '-'} м</span></div>
+      <div class="detail-item"><label>Возраст</label><span>${tree['Возраст'] || '-'} лет</span></div>
+      <div class="detail-item"><label>Состояние</label><span>${tree['Состояние'] || '-'}</span></div>
+      <div class="detail-item" style="grid-column: span 2;"><label>Описание</label><span>${tree['Характеристика состояния'] || '-'}</span></div>
+      <div class="detail-item" style="grid-column: span 2;"><label>Рекомендации</label><span>${tree['Рекомендации по уходу'] || '-'}</span></div>
+    `;
+    removeCheck.checked = (tree.Remove === true || tree.Remove === 'TRUE');
+    document.getElementById('photo1').value = '';
+    document.getElementById('photo2').value = '';
+    document.getElementById('photo3').value = '';
+    document.getElementById('photo4').value = '';
+    statusDiv.textContent = '';
+    modal.style.display = 'block';
+  }
+
+  modalClose.onclick = () => modal.style.display = 'none';
+  window.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
+
+  uploadBtn.addEventListener('click', async () => {
+    if (!currentUid) return;
+    statusDiv.textContent = '⏳ Сохраняем...';
+    const removeBody = new URLSearchParams({ action: 'updateRemove', uid: currentUid, remove: removeCheck.checked });
+    await fetch(API_URL, { method: 'POST', body: removeBody });
+
+    const formData = new FormData();
+    formData.append('action', 'uploadPhotos');
+    formData.append('uid', currentUid);
+    let hasFiles = false;
+    for (let i = 1; i <= 4; i++) {
+      const fileInput = document.getElementById('photo' + i);
+      if (fileInput.files.length > 0) {
+        formData.append('photo' + (i-1), fileInput.files[0]);
+        hasFiles = true;
+      }
+    }
+    if (hasFiles) {
+      await fetch(API_URL, { method: 'POST', body: formData });
     }
 
-    modalClose.onclick = () => modal.style.display = 'none';
-    window.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
+    statusDiv.textContent = '✅ Сохранено!';
+    await loadTrees();
+    setTimeout(() => { statusDiv.textContent = ''; }, 2000);
+  });
 
-    // Сохранение
-    uploadBtn.addEventListener('click', async () => {
-      if (!currentUid) return;
-      statusDiv.textContent = 'Сохранение...';
-
-      // Обновление статуса удаления
-      const removeBody = new URLSearchParams({
-        action: 'updateRemove',
-        uid: currentUid,
-        remove: removeCheck.checked
-      });
-      await fetch(API_URL, { method: 'POST', body: removeBody });
-
-      // Загрузка фото
-      const formData = new FormData();
-      formData.append('action', 'uploadPhotos');
-      formData.append('uid', currentUid);
-      let hasFiles = false;
-      for (let i = 1; i <= 4; i++) {
-        const fileInput = document.getElementById('photo' + i);
-        if (fileInput.files.length > 0) {
-          formData.append('photo' + (i-1), fileInput.files[0]); // нумерация с 0 для скрипта
-          hasFiles = true;
-        }
-      }
-
-      if (hasFiles) {
-        await fetch(API_URL, { method: 'POST', body: formData });
-      }
-
-      statusDiv.textContent = 'Сохранено!';
-      // Обновляем таблицу
-      await loadTrees();
-      setTimeout(() => { statusDiv.textContent = ''; }, 2000);
-    });
-
-    // Запуск
-    loadTrees();
-  </script>
+  // Запуск
+  loadTrees();
+</script>
 </body>
 </html>
