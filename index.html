@@ -1,189 +1,332 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Инвентаризация зелёных насаждений</title>
-  <style>
-    body { font-family: Arial, sans-serif; background: #f5f5f5; margin: 0; padding: 20px; }
-    #plan-container { position: relative; display: inline-block; border: 2px solid #333; line-height: 0; }
-    #plan-img { max-width: 100%; height: auto; display: block; }
-    .tree-marker {
-      position: absolute; width: 18px; height: 18px;
-      background: rgba(0, 128, 0, 0.85); border: 2px solid white;
-      border-radius: 50%; transform: translate(-50%, -50%);
-      cursor: pointer; z-index: 10; transition: 0.2s;
-    }
-    .tree-marker:hover { background: red; width: 22px; height: 22px; }
-    .tree-marker.removed { background: rgba(255, 0, 0, 0.8); }
-    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0;
-      width: 100%; height: 100%; background: rgba(0,0,0,0.6); }
-    .modal-content { background: white; margin: 3% auto; padding: 20px;
-      width: 90%; max-width: 500px; border-radius: 8px; position: relative; }
-    .close { position: absolute; right: 15px; top: 10px; font-size: 28px;
-      font-weight: bold; cursor: pointer; }
-    .tree-info p { margin: 5px 0; }
-    .tree-info label { font-weight: bold; display: inline-block; width: 180px; }
-    .btn { background: #4CAF50; color: white; border: none; padding: 10px 20px;
-      border-radius: 5px; cursor: pointer; margin: 5px; }
-    .btn:hover { opacity: 0.9; }
-    #photo-preview { max-width: 200px; max-height: 200px; margin-top: 10px; display: block; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Инвентаризация зелёных насаждений</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+        }
+        #plan-container {
+            position: relative;
+            display: inline-block;
+            border: 2px solid #333;
+            line-height: 0;
+        }
+        #plan-img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+        }
+        .tree-marker {
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            background: rgba(0, 128, 0, 0.85);
+            border: 2px solid white;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            cursor: pointer;
+            z-index: 10;
+            transition: 0.2s;
+        }
+        .tree-marker:hover {
+            background: red;
+            width: 22px;
+            height: 22px;
+        }
+        .tree-marker.removed {
+            background: rgba(255, 0, 0, 0.8);
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+        }
+        .modal-content {
+            background: white;
+            margin: 3% auto;
+            padding: 20px;
+            width: 90%;
+            max-width: 500px;
+            border-radius: 8px;
+            position: relative;
+        }
+        .close {
+            position: absolute;
+            right: 15px;
+            top: 10px;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .tree-info p {
+            margin: 5px 0;
+        }
+        .tree-info label {
+            font-weight: bold;
+            display: inline-block;
+            width: 180px;
+        }
+        .btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .btn:hover {
+            opacity: 0.9;
+        }
+        #photo-preview {
+            max-width: 200px;
+            max-height: 200px;
+            margin-top: 10px;
+            display: block;
+        }
+        #calibration {
+            margin: 15px 0;
+            padding: 10px;
+            background: #eef;
+            border-radius: 5px;
+            display: inline-block;
+        }
+        #calibration label {
+            display: inline-block;
+            width: 80px;
+            margin-right: 10px;
+        }
+        #calibration input {
+            width: 70px;
+            margin-right: 15px;
+        }
+    </style>
 </head>
 <body>
-  <h2>План зелёных насаждений</h2>
-  <p>Нажмите на маркер растения, чтобы увидеть данные, отметить удаление или загрузить фото.</p>
+    <h2>План зелёных насаждений</h2>
+    <p>Нажмите на маркер, чтобы увидеть данные, отметить удаление или загрузить фото.</p>
 
-  <div id="plan-container">
-    <img id="plan-img" src="plan.jpg" alt="План территории">
-  </div>
-
-  <div id="treeModal" class="modal">
-    <div class="modal-content">
-      <span class="close" id="modalClose">&times;</span>
-      <h3 id="treeTitle"></h3>
-      <div id="treeData" class="tree-info"></div>
-      <div style="margin:10px 0;">
-        <input type="checkbox" id="removeCheck"> <label for="removeCheck">Пометить на удаление</label>
-      </div>
-      <div>
-        <input type="file" id="photoInput" accept="image/*" capture="environment">
-        <button class="btn" id="uploadBtn">Загрузить фото</button>
-      </div>
-      <img id="photo-preview" src="" alt="Фото" style="display:none;">
-      <div id="statusMsg" style="margin-top:10px;"></div>
+    <div id="calibration" style="display:none;">
+        <strong>Калибровка (изменяйте, пока метки не встанут на место):</strong><br>
+        <label>Смещение X:</label><input type="number" id="offsetX" value="0" step="1">
+        <label>Смещение Y:</label><input type="number" id="offsetY" value="0" step="1"><br>
+        <label>Масштаб X:</label><input type="number" id="scaleX" value="1" step="0.01">
+        <label>Масштаб Y:</label><input type="number" id="scaleY" value="1" step="0.01">
+        <button class="btn" id="applyCalibration">Применить</button>
+        <button class="btn" id="saveCalibration" style="background:#2196F3;">Запомнить</button>
+        <span id="savedMsg" style="margin-left:10px; color:green;"></span>
     </div>
-  </div>
 
-  <script src="trees.js"></script>
-  <script>
-    // ---------- НАСТРОЙКИ ----------
-    const API_URL = 'https://script.google.com/macros/s/AKfycby9TMK0ewD9-YXPthheFn26KmtISA08caEV68bx4-VNCNpN7roHAfwLCmJjDr9BEJ4cHg/exec'; // ★ замени на свой URL
+    <div id="plan-container">
+        <img id="plan-img" src="plan.jpg" alt="План территории">
+    </div>
 
-    // ---------- ЛОГИКА ----------
-    const img = document.getElementById('plan-img');
-    const container = document.getElementById('plan-container');
-    const modal = document.getElementById('treeModal');
-    const modalClose = document.getElementById('modalClose');
-    const treeTitle = document.getElementById('treeTitle');
-    const treeDataDiv = document.getElementById('treeData');
-    const removeCheck = document.getElementById('removeCheck');
-    const photoInput = document.getElementById('photoInput');
-    const uploadBtn = document.getElementById('uploadBtn');
-    const photoPreview = document.getElementById('photo-preview');
-    const statusMsg = document.getElementById('statusMsg');
+    <!-- Модальное окно -->
+    <div id="treeModal" class="modal">
+        <div class="modal-content">
+            <span class="close" id="modalClose">&times;</span>
+            <h3 id="treeTitle"></h3>
+            <div id="treeData" class="tree-info"></div>
+            <div style="margin:10px 0;">
+                <input type="checkbox" id="removeCheck"> <label for="removeCheck">Пометить на удаление</label>
+            </div>
+            <div>
+                <input type="file" id="photoInput" accept="image/*" capture="environment">
+                <button class="btn" id="uploadBtn">Загрузить фото</button>
+            </div>
+            <img id="photo-preview" src="" alt="Фото" style="display:none;">
+            <div id="statusMsg" style="margin-top:10px;"></div>
+        </div>
+    </div>
 
-    let currentUid = null;
+    <script src="trees.js"></script>
+    <script>
+        // ---------- НАСТРОЙКИ ----------
+        const API_URL = 'https://script.google.com/macros/s/AKfycby9TMK0ewD9-YXPthheFn26KmtISA08caEV68bx4-VNCNpN7roHAfwLCmJjDr9BEJ4cHg/exec'; // ★ замените на свой URL
 
-    function placeMarkers() {
-      if (!treesRaw || treesRaw.length === 0) return;
-      const imgW = img.clientWidth;
-      const imgH = img.clientHeight;
-      if (imgW === 0 || imgH === 0) return;
-      container.querySelectorAll('.tree-marker').forEach(el => el.remove());
-      let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
-      treesRaw.forEach(t => {
-        if (t.x_raw < xMin) xMin = t.x_raw;
-        if (t.x_raw > xMax) xMax = t.x_raw;
-        if (t.y_raw < yMin) yMin = t.y_raw;
-        if (t.y_raw > yMax) yMax = t.y_raw;
-      });
-      const dx = xMax - xMin;
-      const dy = yMax - yMin;
-      treesRaw.forEach(t => {
-        const px = ((t.x_raw - xMin) / dx) * imgW;
-        const py = ((t.y_raw - yMin) / dy) * imgH;
-        const dot = document.createElement('div');
-        dot.className = 'tree-marker';
-        dot.style.left = px + 'px';
-        dot.style.top = py + 'px';
-        dot.dataset.uid = t.uid;
-        dot.addEventListener('click', () => openModal(t.uid));
-        container.appendChild(dot);
-      });
-    }
+        // ---------- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ----------
+        const img = document.getElementById('plan-img');
+        const container = document.getElementById('plan-container');
+        const modal = document.getElementById('treeModal');
+        const modalClose = document.getElementById('modalClose');
+        const treeTitle = document.getElementById('treeTitle');
+        const treeDataDiv = document.getElementById('treeData');
+        const removeCheck = document.getElementById('removeCheck');
+        const photoInput = document.getElementById('photoInput');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const photoPreview = document.getElementById('photo-preview');
+        const statusMsg = document.getElementById('statusMsg');
 
-    img.addEventListener('load', placeMarkers);
-    window.addEventListener('resize', placeMarkers);
+        let currentUid = null;
+        let calibration = { offsetX: 0, offsetY: 0, scaleX: 1, scaleY: 1 };
 
-    async function openModal(uid) {
-      currentUid = uid;
-      statusMsg.textContent = '';
-      removeCheck.checked = false;
-      photoPreview.style.display = 'none';
-      treeDataDiv.innerHTML = 'Загрузка...';
-      modal.style.display = 'block';
-      try {
-        const resp = await fetch(API_URL + '?uid=' + uid);
-        const data = await resp.json();
-        if (data.error) {
-          treeDataDiv.innerHTML = '<p style="color:red;">' + data.error + '</p>';
-          return;
+        // Пытаемся загрузить сохранённую калибровку
+        try {
+            const saved = localStorage.getItem('treeCalibration');
+            if (saved) {
+                calibration = JSON.parse(saved);
+                document.getElementById('offsetX').value = calibration.offsetX;
+                document.getElementById('offsetY').value = calibration.offsetY;
+                document.getElementById('scaleX').value = calibration.scaleX;
+                document.getElementById('scaleY').value = calibration.scaleY;
+            }
+        } catch (e) {}
+
+        // ---------- ФУНКЦИИ МАРКЕРОВ ----------
+        function placeMarkers() {
+            if (!treesRaw || treesRaw.length === 0) return;
+            const imgW = img.clientWidth;
+            const imgH = img.clientHeight;
+            if (imgW === 0 || imgH === 0) return;
+
+            // удаляем старые маркеры
+            container.querySelectorAll('.tree-marker').forEach(el => el.remove());
+
+            // границы исходных координат
+            let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
+            treesRaw.forEach(t => {
+                if (t.x_raw < xMin) xMin = t.x_raw;
+                if (t.x_raw > xMax) xMax = t.x_raw;
+                if (t.y_raw < yMin) yMin = t.y_raw;
+                if (t.y_raw > yMax) yMax = t.y_raw;
+            });
+            const dx = xMax - xMin;
+            const dy = yMax - yMin;
+
+            treesRaw.forEach(t => {
+                // нормализованные координаты [0..1]
+                const nx = (t.x_raw - xMin) / dx;
+                const ny = (t.y_raw - yMin) / dy;
+                // применяем калибровку
+                const px = nx * imgW * calibration.scaleX + calibration.offsetX;
+                const py = ny * imgH * calibration.scaleY + calibration.offsetY;
+
+                const dot = document.createElement('div');
+                dot.className = 'tree-marker';
+                dot.style.left = px + 'px';
+                dot.style.top = py + 'px';
+                dot.dataset.uid = t.uid;
+                dot.addEventListener('click', () => openModal(t.uid));
+                container.appendChild(dot);
+            });
         }
-        const fields = [
-          ['Номер растения', 'Номер растения'],
-          ['Вид растения', 'Вид растения'],
-          ['Жизненная форма', 'Жизненная форма'],
-          ['Тип насаждения', 'Тип насаждения'],
-          ['Диаметр', 'Диаметр'],
-          ['Высота', 'Высота'],
-          ['Возраст', 'Возраст'],
-          ['Состояние', 'Состояние'],
-          ['Характеристика состояния', 'Характеристика состояния'],
-          ['Рекомендации по уходу', 'Рекомендации по уходу'],
-          ['Особо ценное', 'Особо ценное']
-        ];
-        let html = '';
-        fields.forEach(([key, label]) => {
-          if (data[key] !== undefined && data[key] !== '') {
-            html += '<p><label>' + label + ':</label> ' + data[key] + '</p>';
-          }
+
+        img.addEventListener('load', placeMarkers);
+        window.addEventListener('resize', placeMarkers);
+
+        // ---------- КАЛИБРОВКА ----------
+        document.getElementById('applyCalibration').addEventListener('click', function() {
+            calibration.offsetX = parseFloat(document.getElementById('offsetX').value) || 0;
+            calibration.offsetY = parseFloat(document.getElementById('offsetY').value) || 0;
+            calibration.scaleX = parseFloat(document.getElementById('scaleX').value) || 1;
+            calibration.scaleY = parseFloat(document.getElementById('scaleY').value) || 1;
+            placeMarkers();
         });
-        treeTitle.textContent = (data['Вид растения'] || 'Растение') + ' (ID ' + (data['ID'] || '') + ')';
-        treeDataDiv.innerHTML = html;
-        removeCheck.checked = (data['Remove'] === true || data['Remove'] === 'TRUE');
-        if (data['PhotoURL']) {
-          photoPreview.src = data['PhotoURL'];
-          photoPreview.style.display = 'block';
+
+        document.getElementById('saveCalibration').addEventListener('click', function() {
+            calibration.offsetX = parseFloat(document.getElementById('offsetX').value) || 0;
+            calibration.offsetY = parseFloat(document.getElementById('offsetY').value) || 0;
+            calibration.scaleX = parseFloat(document.getElementById('scaleX').value) || 1;
+            calibration.scaleY = parseFloat(document.getElementById('scaleY').value) || 1;
+            localStorage.setItem('treeCalibration', JSON.stringify(calibration));
+            document.getElementById('savedMsg').textContent = 'Сохранено!';
+            setTimeout(() => { document.getElementById('savedMsg').textContent = ''; }, 2000);
+        });
+
+        // Показать панель калибровки (можно спрятать, когда настроено)
+        document.getElementById('calibration').style.display = 'inline-block';
+
+        // ---------- МОДАЛЬНОЕ ОКНО ----------
+        async function openModal(uid) {
+            currentUid = uid;
+            statusMsg.textContent = '';
+            removeCheck.checked = false;
+            photoPreview.style.display = 'none';
+            treeDataDiv.innerHTML = 'Загрузка...';
+            modal.style.display = 'block';
+
+            try {
+                const resp = await fetch(API_URL + '?uid=' + uid);
+                const data = await resp.json();
+                if (data.error) {
+                    treeDataDiv.innerHTML = '<p style="color:red;">' + data.error + '</p>';
+                    return;
+                }
+                const fields = [
+                    ['Номер растения', 'Номер растения'],
+                    ['Вид растения', 'Вид растения'],
+                    ['Жизненная форма', 'Жизненная форма'],
+                    ['Тип насаждения', 'Тип насаждения'],
+                    ['Диаметр', 'Диаметр'],
+                    ['Высота', 'Высота'],
+                    ['Возраст', 'Возраст'],
+                    ['Состояние', 'Состояние'],
+                    ['Характеристика состояния', 'Характеристика состояния'],
+                    ['Рекомендации по уходу', 'Рекомендации по уходу'],
+                    ['Особо ценное', 'Особо ценное']
+                ];
+                let html = '';
+                fields.forEach(([key, label]) => {
+                    if (data[key] !== undefined && data[key] !== '') {
+                        html += '<p><label>' + label + ':</label> ' + data[key] + '</p>';
+                    }
+                });
+                treeTitle.textContent = (data['Вид растения'] || 'Растение') + ' (ID ' + (data['ID'] || '') + ')';
+                treeDataDiv.innerHTML = html;
+                removeCheck.checked = (data['Remove'] === true || data['Remove'] === 'TRUE');
+                if (data['PhotoURL']) {
+                    photoPreview.src = data['PhotoURL'];
+                    photoPreview.style.display = 'block';
+                }
+            } catch (err) {
+                treeDataDiv.innerHTML = '<p style="color:red;">Ошибка связи</p>';
+            }
         }
-      } catch (err) {
-        treeDataDiv.innerHTML = '<p style="color:red;">Ошибка связи</p>';
-      }
-    }
 
-    removeCheck.addEventListener('change', async () => {
-      if (!currentUid) return;
-      const body = new URLSearchParams({ action: 'updateRemove', uid: currentUid, remove: removeCheck.checked });
-      const resp = await fetch(API_URL, { method: 'POST', body });
-      const result = await resp.json();
-      statusMsg.textContent = result.success ? 'Статус обновлён' : 'Ошибка: ' + result.error;
-      const dot = document.querySelector('.tree-marker[data-uid="' + currentUid + '"]');
-      if (dot) dot.classList.toggle('removed', removeCheck.checked);
-    });
+        removeCheck.addEventListener('change', async () => {
+            if (!currentUid) return;
+            const body = new URLSearchParams({ action: 'updateRemove', uid: currentUid, remove: removeCheck.checked });
+            const resp = await fetch(API_URL, { method: 'POST', body });
+            const result = await resp.json();
+            statusMsg.textContent = result.success ? 'Статус обновлён' : 'Ошибка: ' + result.error;
+            const dot = document.querySelector('.tree-marker[data-uid="' + currentUid + '"]');
+            if (dot) dot.classList.toggle('removed', removeCheck.checked);
+        });
 
-    uploadBtn.addEventListener('click', async () => {
-      if (!currentUid) return;
-      const file = photoInput.files[0];
-      if (!file) { statusMsg.textContent = 'Выберите файл'; return; }
-      statusMsg.textContent = 'Загрузка...';
-      const formData = new FormData();
-      formData.append('action', 'uploadPhoto');
-      formData.append('uid', currentUid);
-      formData.append('photo', file);
-      const resp = await fetch(API_URL, { method: 'POST', body: formData });
-      const result = await resp.json();
-      if (result.success) {
-        photoPreview.src = result.photoUrl;
-        photoPreview.style.display = 'block';
-        statusMsg.textContent = 'Фото загружено';
-        photoInput.value = '';
-      } else {
-        statusMsg.textContent = 'Ошибка: ' + result.error;
-      }
-    });
+        uploadBtn.addEventListener('click', async () => {
+            if (!currentUid) return;
+            const file = photoInput.files[0];
+            if (!file) { statusMsg.textContent = 'Выберите файл'; return; }
+            statusMsg.textContent = 'Загрузка...';
+            const formData = new FormData();
+            formData.append('action', 'uploadPhoto');
+            formData.append('uid', currentUid);
+            formData.append('photo', file);
+            const resp = await fetch(API_URL, { method: 'POST', body: formData });
+            const result = await resp.json();
+            if (result.success) {
+                photoPreview.src = result.photoUrl;
+                photoPreview.style.display = 'block';
+                statusMsg.textContent = 'Фото загружено';
+                photoInput.value = '';
+            } else {
+                statusMsg.textContent = 'Ошибка: ' + result.error;
+            }
+        });
 
-    modalClose.onclick = () => modal.style.display = 'none';
-    window.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
-  </script>
+        modalClose.onclick = () => modal.style.display = 'none';
+        window.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
+    </script>
 </body>
 </html>
