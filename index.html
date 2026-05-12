@@ -7,7 +7,7 @@
     <style>
         body { font-family: Arial, sans-serif; background: #f5f5f5; margin: 0; padding: 20px; }
         #plan-container { position: relative; display: inline-block; border: 2px solid #333; line-height: 0; }
-        #plan-img { max-width: 100%; height: auto; display: block; }
+        #plan-img { max-width: 100%; height: auto; display: block; cursor: crosshair; }
         .tree-marker {
             position: absolute; width: 18px; height: 18px;
             background: rgba(0, 128, 0, 0.85); border: 2px solid white;
@@ -16,6 +16,12 @@
         }
         .tree-marker:hover { background: red; width: 22px; height: 22px; }
         .tree-marker.removed { background: rgba(255, 0, 0, 0.8); }
+        .calibration-point {
+            position: absolute; width: 14px; height: 14px;
+            background: red; border: 2px solid yellow;
+            border-radius: 50%; transform: translate(-50%, -50%);
+            cursor: pointer; z-index: 20;
+        }
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0;
             width: 100%; height: 100%; background: rgba(0,0,0,0.6); }
         .modal-content { background: white; margin: 3% auto; padding: 20px;
@@ -28,25 +34,28 @@
             border-radius: 5px; cursor: pointer; margin: 5px; }
         .btn:hover { opacity: 0.9; }
         #photo-preview { max-width: 200px; max-height: 200px; margin-top: 10px; display: block; }
-        #calibration { margin: 15px 0; padding: 10px; background: #eef; border-radius: 5px; display: inline-block; }
-        #calibration label { display: inline-block; width: 80px; margin-right: 10px; }
-        #calibration input { width: 70px; margin-right: 15px; }
+        #calibration-panel { margin: 15px 0; padding: 10px; background: #eef; border-radius: 5px; display: inline-block; }
+        #calibration-panel label { font-weight: bold; }
+        #calibration-points-list { max-height: 150px; overflow-y: auto; margin: 10px 0; }
+        .point-entry { margin: 5px 0; }
     </style>
 </head>
 <body>
     <h2>План зелёных насаждений</h2>
     <p>Нажмите на маркер, чтобы увидеть данные, отметить удаление или загрузить фото.</p>
 
-    <!-- Панель калибровки (всегда видна) -->
-    <div id="calibration">
-        <strong>Калибровка маркеров:</strong><br>
-        <label>Смещение X:</label><input type="number" id="offsetX" value="0" step="1">
-        <label>Смещение Y:</label><input type="number" id="offsetY" value="0" step="1"><br>
-        <label>Масштаб X:</label><input type="number" id="scaleX" value="1" step="0.01">
-        <label>Масштаб Y:</label><input type="number" id="scaleY" value="1" step="0.01">
-        <button class="btn" id="applyCalibration">Применить</button>
-        <button class="btn" id="saveCalibration" style="background:#2196F3;">Запомнить</button>
+    <div id="calibration-panel">
+        <strong>Калибровка по опорным точкам</strong>
+        <p>Кликните на плане по известному растению, выберите его в списке и нажмите "Добавить точку". Добавьте 3–4 точки, затем вычислите преобразование.</p>
+        <select id="treeSelect">
+            <option value="">-- Выберите растение --</option>
+        </select>
+        <button class="btn" id="addPointBtn">Добавить точку</button>
+        <button class="btn" id="computeBtn">Вычислить и применить</button>
+        <button class="btn" id="saveCalibBtn" style="background:#2196F3;">Запомнить</button>
         <span id="savedMsg" style="margin-left:10px; color:green;"></span>
+        <div id="calibration-points-list"></div>
+        <button class="btn" id="clearPointsBtn" style="background:#f44336;">Очистить точки</button>
     </div>
 
     <div id="plan-container">
@@ -74,37 +83,144 @@
     <script src="trees.js"></script>
     <script>
         // ---------- НАСТРОЙКИ ----------
-        const API_URL = 'ВАШ_API_URL'; // ★ замените на свой URL
+        const API_URL = 'ВАШ_API_URL'; // ★ замените на свой
 
-        // ---------- ЛОГИКА ----------
+        // ---------- ДАННЫЕ ----------
         const img = document.getElementById('plan-img');
         const container = document.getElementById('plan-container');
-        const modal = document.getElementById('treeModal');
-        const modalClose = document.getElementById('modalClose');
-        const treeTitle = document.getElementById('treeTitle');
-        const treeDataDiv = document.getElementById('treeData');
-        const removeCheck = document.getElementById('removeCheck');
-        const photoInput = document.getElementById('photoInput');
-        const uploadBtn = document.getElementById('uploadBtn');
-        const photoPreview = document.getElementById('photo-preview');
-        const statusMsg = document.getElementById('statusMsg');
+        const treeSelect = document.getElementById('treeSelect');
+        const addPointBtn = document.getElementById('addPointBtn');
+        const computeBtn = document.getElementById('computeBtn');
+        const saveCalibBtn = document.getElementById('saveCalibBtn');
+        const savedMsg = document.getElementById('savedMsg');
+        const pointsList = document.getElementById('calibration-points-list');
+        const clearPointsBtn = document.getElementById('clearPointsBtn');
 
-        let currentUid = null;
-        let calibration = { offsetX: 0, offsetY: 0, scaleX: 1, scaleY: 1 };
+        let calibrationPoints = []; // { x_pix, y_pix, x_raw, y_raw }
+        let transformMatrix = null; // коэффициенты a,b,c,d,e,f для x' = a*x + b*y + c, y' = d*x + e*y + f
 
-        // Загружаем сохранённую калибровку, если есть
-        try {
-            const saved = localStorage.getItem('treeCalibration');
-            if (saved) {
-                calibration = JSON.parse(saved);
-                document.getElementById('offsetX').value = calibration.offsetX;
-                document.getElementById('offsetY').value = calibration.offsetY;
-                document.getElementById('scaleX').value = calibration.scaleX;
-                document.getElementById('scaleY').value = calibration.scaleY;
+        // Заполняем выпадающий список деревьями
+        function populateSelect() {
+            treesRaw.forEach(t => {
+                const option = document.createElement('option');
+                option.value = t.uid;
+                option.textContent = `ID ${t.id} (${t.x_raw.toFixed(1)}, ${t.y_raw.toFixed(1)})`;
+                treeSelect.appendChild(option);
+            });
+        }
+
+        // Отрисовка списка опорных точек
+        function renderPointsList() {
+            let html = '';
+            calibrationPoints.forEach((p, i) => {
+                const tree = treesRaw.find(t => t.uid == p.uid);
+                const name = tree ? `ID ${tree.id}` : '?';
+                html += `<div class="point-entry">${i+1}. Пикс: (${Math.round(p.x_pix)}, ${Math.round(p.y_pix)}) → ${name} (${p.x_raw.toFixed(1)}, ${p.y_raw.toFixed(1)}) 
+                    <button data-index="${i}" class="btn" style="background:orange; padding:2px 8px;">×</button></div>`;
+            });
+            pointsList.innerHTML = html;
+            document.querySelectorAll('.point-entry button').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const idx = parseInt(this.dataset.index);
+                    calibrationPoints.splice(idx, 1);
+                    renderPointsList();
+                    drawCalibrationPoints();
+                });
+            });
+        }
+
+        // Добавление новой опорной точки
+        function addCalibrationPoint(uid, x_pix, y_pix) {
+            const tree = treesRaw.find(t => t.uid == uid);
+            if (!tree) return alert('Выберите растение из списка!');
+            // Проверяем, нет ли уже этой точки
+            if (calibrationPoints.some(p => p.uid == uid)) {
+                alert('Это растение уже добавлено.');
+                return;
             }
-        } catch (e) {}
+            calibrationPoints.push({ uid, x_pix, y_pix, x_raw: tree.x_raw, y_raw: tree.y_raw });
+            renderPointsList();
+            drawCalibrationPoints();
+        }
 
-        function placeMarkers() {
+        // Отображение красных кружков опорных точек на плане
+        function drawCalibrationPoints() {
+            container.querySelectorAll('.calibration-point').forEach(el => el.remove());
+            calibrationPoints.forEach(p => {
+                const dot = document.createElement('div');
+                dot.className = 'calibration-point';
+                dot.style.left = p.x_pix + 'px';
+                dot.style.top = p.y_pix + 'px';
+                container.appendChild(dot);
+            });
+        }
+
+        // Решение системы линейных уравнений методом Гаусса (матрица n x (n+1))
+        function gauss(A) {
+            const n = A.length;
+            for (let i=0; i<n; i++) {
+                // Поиск максимума в столбце
+                let maxEl = Math.abs(A[i][i]), maxRow = i;
+                for (let k=i+1; k<n; k++) {
+                    if (Math.abs(A[k][i]) > maxEl) {
+                        maxEl = Math.abs(A[k][i]);
+                        maxRow = k;
+                    }
+                }
+                // Перестановка строк
+                [A[i], A[maxRow]] = [A[maxRow], A[i]];
+                // Нормализация
+                const div = A[i][i];
+                for (let j=i; j<=n; j++) A[i][j] /= div;
+                // Вычитание из остальных строк
+                for (let k=0; k<n; k++) {
+                    if (k === i) continue;
+                    const factor = A[k][i];
+                    for (let j=i; j<=n; j++) A[k][j] -= factor * A[i][j];
+                }
+            }
+            return A.map(row => row[n]);
+        }
+
+        // Вычисление аффинного преобразования по 3+ точкам (метод наименьших квадратов через псевдообратную матрицу)
+        function computeAffineTransform(points) {
+            // points: массив {x_raw, y_raw, x_pix, y_pix}
+            // Ищем матрицу 2x3: [a, b, c; d, e, f]
+            // Система: x_pix = a*x_raw + b*y_raw + c
+            //          y_pix = d*x_raw + e*y_raw + f
+            // Составляем матрицу M (2N x 6) и вектор RHS (2N)
+            const N = points.length;
+            let M = [], rhs = [];
+            for (let p of points) {
+                // первое уравнение
+                M.push([p.x_raw, p.y_raw, 1, 0, 0, 0]);
+                rhs.push(p.x_pix);
+                // второе уравнение
+                M.push([0, 0, 0, p.x_raw, p.y_raw, 1]);
+                rhs.push(p.y_pix);
+            }
+            // Решаем M^T * M * x = M^T * rhs
+            let MtM = Array(6).fill().map(() => Array(6).fill(0));
+            let Mtrhs = Array(6).fill(0);
+            for (let i = 0; i < 2*N; i++) {
+                for (let j = 0; j < 6; j++) {
+                    Mtrhs[j] += M[i][j] * rhs[i];
+                    for (let k = 0; k < 6; k++) {
+                        MtM[j][k] += M[i][j] * M[i][k];
+                    }
+                }
+            }
+            // Расширенная матрица 6x7
+            let aug = [];
+            for (let i=0; i<6; i++) {
+                aug.push([...MtM[i], Mtrhs[i]]);
+            }
+            const sol = gauss(aug);
+            return { a: sol[0], b: sol[1], c: sol[2], d: sol[3], e: sol[4], f: sol[5] };
+        }
+
+        // Применяем преобразование ко всем маркерам
+        function placeMarkersWithTransform(T) {
             if (!treesRaw || treesRaw.length === 0) return;
             const imgW = img.clientWidth;
             const imgH = img.clientHeight;
@@ -112,21 +228,12 @@
 
             container.querySelectorAll('.tree-marker').forEach(el => el.remove());
 
-            let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
             treesRaw.forEach(t => {
-                if (t.x_raw < xMin) xMin = t.x_raw;
-                if (t.x_raw > xMax) xMax = t.x_raw;
-                if (t.y_raw < yMin) yMin = t.y_raw;
-                if (t.y_raw > yMax) yMax = t.y_raw;
-            });
-            const dx = xMax - xMin;
-            const dy = yMax - yMin;
+                const px = T.a * t.x_raw + T.b * t.y_raw + T.c;
+                const py = T.d * t.x_raw + T.e * t.y_raw + T.f;
 
-            treesRaw.forEach(t => {
-                const nx = (t.x_raw - xMin) / dx;
-                const ny = (t.y_raw - yMin) / dy;
-                const px = nx * imgW * calibration.scaleX + calibration.offsetX;
-                const py = ny * imgH * calibration.scaleY + calibration.offsetY;
+                // Ограничиваем, чтобы не вылезало за границы контейнера
+                if (px < 0 || px > imgW || py < 0 || py > imgH) return;
 
                 const dot = document.createElement('div');
                 dot.className = 'tree-marker';
@@ -138,29 +245,115 @@
             });
         }
 
-        img.addEventListener('load', placeMarkers);
-        window.addEventListener('resize', placeMarkers);
-
-        // ---------- КАЛИБРОВКА ----------
-        document.getElementById('applyCalibration').addEventListener('click', function() {
-            calibration.offsetX = parseFloat(document.getElementById('offsetX').value) || 0;
-            calibration.offsetY = parseFloat(document.getElementById('offsetY').value) || 0;
-            calibration.scaleX = parseFloat(document.getElementById('scaleX').value) || 1;
-            calibration.scaleY = parseFloat(document.getElementById('scaleY').value) || 1;
-            placeMarkers();
+        // Обработчики
+        addPointBtn.addEventListener('click', () => {
+            const uid = parseInt(treeSelect.value);
+            if (!uid) return alert('Выберите растение из списка.');
+            // Ждём клика по плану
+            alert('Теперь кликните по этому растению на плане.');
+            const handler = function(e) {
+                const rect = img.getBoundingClientRect();
+                const scaleX = img.clientWidth / rect.width;
+                const scaleY = img.clientHeight / rect.height;
+                const x_pix = (e.clientX - rect.left) * scaleX;
+                const y_pix = (e.clientY - rect.top) * scaleY;
+                addCalibrationPoint(uid, x_pix, y_pix);
+                img.removeEventListener('click', handler);
+            };
+            img.addEventListener('click', handler);
         });
 
-        document.getElementById('saveCalibration').addEventListener('click', function() {
-            calibration.offsetX = parseFloat(document.getElementById('offsetX').value) || 0;
-            calibration.offsetY = parseFloat(document.getElementById('offsetY').value) || 0;
-            calibration.scaleX = parseFloat(document.getElementById('scaleX').value) || 1;
-            calibration.scaleY = parseFloat(document.getElementById('scaleY').value) || 1;
-            localStorage.setItem('treeCalibration', JSON.stringify(calibration));
-            document.getElementById('savedMsg').textContent = 'Сохранено!';
-            setTimeout(() => { document.getElementById('savedMsg').textContent = ''; }, 2000);
+        computeBtn.addEventListener('click', () => {
+            if (calibrationPoints.length < 3) {
+                return alert('Нужно минимум 3 опорные точки.');
+            }
+            const T = computeAffineTransform(calibrationPoints);
+            transformMatrix = T;
+            placeMarkersWithTransform(T);
+            // Очищаем опорные точки (опционально)
+            calibrationPoints = [];
+            renderPointsList();
+            container.querySelectorAll('.calibration-point').forEach(el => el.remove());
+            localStorage.setItem('treeTransform', JSON.stringify(T));
         });
 
-        // ---------- МОДАЛЬНОЕ ОКНО ----------
+        saveCalibBtn.addEventListener('click', () => {
+            if (transformMatrix) {
+                localStorage.setItem('treeTransform', JSON.stringify(transformMatrix));
+                savedMsg.textContent = 'Преобразование сохранено!';
+                setTimeout(() => savedMsg.textContent = '', 2000);
+            } else {
+                alert('Сначала вычислите преобразование.');
+            }
+        });
+
+        clearPointsBtn.addEventListener('click', () => {
+            calibrationPoints = [];
+            renderPointsList();
+            container.querySelectorAll('.calibration-point').forEach(el => el.remove());
+        });
+
+        // Попытка загрузить сохранённое преобразование
+        try {
+            const savedT = localStorage.getItem('treeTransform');
+            if (savedT) {
+                transformMatrix = JSON.parse(savedT);
+                img.addEventListener('load', () => placeMarkersWithTransform(transformMatrix));
+                if (img.complete) placeMarkersWithTransform(transformMatrix);
+            } else {
+                // первичная расстановка без калибровки
+                img.addEventListener('load', placeMarkersSimple);
+                if (img.complete) placeMarkersSimple();
+            }
+        } catch(e) {}
+
+        function placeMarkersSimple() {
+            // простой вариант (как раньше) если нет сохранённого преобразования
+            if (!treesRaw || treesRaw.length === 0) return;
+            const imgW = img.clientWidth;
+            const imgH = img.clientHeight;
+            if (imgW === 0 || imgH === 0) return;
+            container.querySelectorAll('.tree-marker').forEach(el => el.remove());
+            let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
+            treesRaw.forEach(t => {
+                if (t.x_raw < xMin) xMin = t.x_raw;
+                if (t.x_raw > xMax) xMax = t.x_raw;
+                if (t.y_raw < yMin) yMin = t.y_raw;
+                if (t.y_raw > yMax) yMax = t.y_raw;
+            });
+            const dx = xMax - xMin;
+            const dy = yMax - yMin;
+            treesRaw.forEach(t => {
+                const nx = (t.x_raw - xMin) / dx;
+                const ny = (t.y_raw - yMin) / dy;
+                const px = nx * imgW;
+                const py = ny * imgH;
+                const dot = document.createElement('div');
+                dot.className = 'tree-marker';
+                dot.style.left = px + 'px';
+                dot.style.top = py + 'px';
+                dot.dataset.uid = t.uid;
+                dot.addEventListener('click', () => openModal(t.uid));
+                container.appendChild(dot);
+            });
+        }
+
+        // ---------- ИНИЦИАЛИЗАЦИЯ ----------
+        populateSelect();
+
+        // Остальной код модального окна, обработки Remove и фото – без изменений
+        const modal = document.getElementById('treeModal');
+        const modalClose = document.getElementById('modalClose');
+        const treeTitle = document.getElementById('treeTitle');
+        const treeDataDiv = document.getElementById('treeData');
+        const removeCheck = document.getElementById('removeCheck');
+        const photoInput = document.getElementById('photoInput');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const photoPreview = document.getElementById('photo-preview');
+        const statusMsg = document.getElementById('statusMsg');
+
+        let currentUid = null;
+
         async function openModal(uid) {
             currentUid = uid;
             statusMsg.textContent = '';
@@ -168,7 +361,6 @@
             photoPreview.style.display = 'none';
             treeDataDiv.innerHTML = 'Загрузка...';
             modal.style.display = 'block';
-
             try {
                 const resp = await fetch(API_URL + '?uid=' + uid);
                 const data = await resp.json();
