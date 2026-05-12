@@ -9,12 +9,12 @@
     #plan-container { position: relative; display: inline-block; border: 2px solid #333; line-height: 0; }
     #plan-img { max-width: 100%; height: auto; display: block; }
     .tree-marker {
-      position: absolute; width: 16px; height: 16px;
-      background: rgba(0, 128, 0, 0.8); border: 2px solid #fff;
+      position: absolute; width: 18px; height: 18px;
+      background: rgba(0, 128, 0, 0.85); border: 2px solid white;
       border-radius: 50%; transform: translate(-50%, -50%);
       cursor: pointer; z-index: 10; transition: 0.2s;
     }
-    .tree-marker:hover { background: red; width: 20px; height: 20px; }
+    .tree-marker:hover { background: red; width: 22px; height: 22px; }
     .tree-marker.removed { background: rgba(255, 0, 0, 0.8); }
     .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0;
       width: 100%; height: 100%; background: rgba(0,0,0,0.6); }
@@ -26,6 +26,7 @@
     .tree-info label { font-weight: bold; display: inline-block; width: 180px; }
     .btn { background: #4CAF50; color: white; border: none; padding: 10px 20px;
       border-radius: 5px; cursor: pointer; margin: 5px; }
+    .btn:hover { opacity: 0.9; }
     #photo-preview { max-width: 200px; max-height: 200px; margin-top: 10px; display: block; }
   </style>
 </head>
@@ -40,7 +41,7 @@
   <div id="treeModal" class="modal">
     <div class="modal-content">
       <span class="close" id="modalClose">&times;</span>
-      <h3 id="treeTitle">Растение</h3>
+      <h3 id="treeTitle"></h3>
       <div id="treeData" class="tree-info"></div>
       <div style="margin:10px 0;">
         <input type="checkbox" id="removeCheck"> <label for="removeCheck">Пометить на удаление</label>
@@ -49,16 +50,15 @@
         <input type="file" id="photoInput" accept="image/*" capture="environment">
         <button class="btn" id="uploadBtn">Загрузить фото</button>
       </div>
-      <img id="photo-preview" src="" alt="Фото отсутствует" style="display:none;">
-      <div id="statusMsg"></div>
+      <img id="photo-preview" src="" alt="Фото" style="display:none;">
+      <div id="statusMsg" style="margin-top:10px;"></div>
     </div>
   </div>
 
-  <!-- Подключаем массив с координатами и логику -->
   <script src="trees.js"></script>
   <script>
     // ---------- НАСТРОЙКИ ----------
-    const API_URL = 'ВАШ_URL_ВЕБ_ПРИЛОЖЕНИЯ'; // ← замените на свой
+    const API_URL = 'https://script.google.com/macros/s/AKfycby9TMK0ewD9-YXPthheFn26KmtISA08caEV68bx4-VNCNpN7roHAfwLCmJjDr9BEJ4cHg/exec'; // ★ замени на свой URL
 
     // ---------- ЛОГИКА ----------
     const img = document.getElementById('plan-img');
@@ -75,22 +75,21 @@
 
     let currentUid = null;
 
-    // Вычисляем границы координат
-    let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
-    treesRaw.forEach(t => {
-      if (t.x_raw < xMin) xMin = t.x_raw;
-      if (t.x_raw > xMax) xMax = t.x_raw;
-      if (t.y_raw < yMin) yMin = t.y_raw;
-      if (t.y_raw > yMax) yMax = t.y_raw;
-    });
-    const dx = xMax - xMin;
-    const dy = yMax - yMin;
-
     function placeMarkers() {
+      if (!treesRaw || treesRaw.length === 0) return;
       const imgW = img.clientWidth;
       const imgH = img.clientHeight;
       if (imgW === 0 || imgH === 0) return;
       container.querySelectorAll('.tree-marker').forEach(el => el.remove());
+      let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
+      treesRaw.forEach(t => {
+        if (t.x_raw < xMin) xMin = t.x_raw;
+        if (t.x_raw > xMax) xMax = t.x_raw;
+        if (t.y_raw < yMin) yMin = t.y_raw;
+        if (t.y_raw > yMax) yMax = t.y_raw;
+      });
+      const dx = xMax - xMin;
+      const dy = yMax - yMin;
       treesRaw.forEach(t => {
         const px = ((t.x_raw - xMin) / dx) * imgW;
         const py = ((t.y_raw - yMin) / dy) * imgH;
@@ -114,7 +113,6 @@
       photoPreview.style.display = 'none';
       treeDataDiv.innerHTML = 'Загрузка...';
       modal.style.display = 'block';
-
       try {
         const resp = await fetch(API_URL + '?uid=' + uid);
         const data = await resp.json();
