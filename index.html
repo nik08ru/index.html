@@ -55,7 +55,6 @@
       font-size: 14px;
       color: #475569;
     }
-
     .table-container {
       overflow-x: auto;
       border-radius: 14px;
@@ -143,7 +142,7 @@
     }
     .modal-content {
       background: white;
-      margin: 10% auto;
+      margin: 5% auto;
       padding: 20px;
       width: 94%;
       max-width: 500px;
@@ -248,7 +247,7 @@
 </div>
 
 <script>
-  const API_URL = 'https://script.google.com/macros/s/AKfycbyJP1Merj9tcAgH0XZ3itr5eBfKnBN67tDQ6kFiKllSSzrtLIbKjKu6CiUERdBlXH32kw/exec';
+  const API_URL = 'https://script.google.com/macros/s/AKfycbzmB6drMFPTSpuuLVK5tDTE6C5vMSxhq5RHTQqU4Xlo-4KacWT9ymtKJLoMw57En4wfYA/exec';
 
   let allTrees = [];
   let currentUid = null;
@@ -265,6 +264,7 @@
   const uploadBtn = document.getElementById('uploadBtn');
   const statusDiv = document.getElementById('status');
 
+  // Загрузка списка деревьев
   async function loadTrees() {
     try {
       const resp = await fetch(API_URL + '?action=list');
@@ -343,6 +343,16 @@
   modalClose.onclick = () => modal.style.display = 'none';
   window.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
 
+  // Чтение файла как base64
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
   uploadBtn.addEventListener('click', async () => {
     if (!currentUid) return;
     statusDiv.textContent = '⏳ Сохраняем...';
@@ -358,24 +368,32 @@
       return;
     }
 
-    // Отправляем фото, если есть
-    const formData = new FormData();
-    formData.append('action', 'uploadPhotos');
-    formData.append('uid', currentUid);
-    let hasFiles = false;
-    for (let i = 1; i <= 4; i++) {
-      const fileInput = document.getElementById('photo' + i);
-      if (fileInput.files.length > 0) {
-        formData.append(`photo${i-1}`, fileInput.files[0]); // имена photo0, photo1...
-        hasFiles = true;
-      }
-    }
+    // Собираем выбранные файлы
+    const fileInputs = [
+      document.getElementById('photo1'),
+      document.getElementById('photo2'),
+      document.getElementById('photo3'),
+      document.getElementById('photo4')
+    ];
+    const files = fileInputs.filter(inp => inp.files.length > 0).map(inp => inp.files[0]);
 
-    if (hasFiles) {
+    if (files.length > 0) {
       try {
+        // Преобразуем все файлы в base64
+        const base64Promises = files.map(fileToBase64);
+        const base64Strings = await Promise.all(base64Promises);
+
+        // Формируем параметры как URLSearchParams
+        const params = new URLSearchParams();
+        params.append('action', 'uploadPhotos');
+        params.append('uid', currentUid);
+        base64Strings.forEach((b64, idx) => {
+          params.append('photo' + idx, b64);
+        });
+
         const photoResp = await fetch(API_URL, {
           method: 'POST',
-          body: formData
+          body: params
         });
         const photoResult = await photoResp.json();
         if (photoResult.error) {
@@ -384,7 +402,7 @@
           return;
         }
       } catch (err) {
-        statusDiv.textContent = '❌ Сетевая ошибка при загрузке фото';
+        statusDiv.textContent = '❌ Ошибка обработки фото';
         statusDiv.className = 'error';
         return;
       }
