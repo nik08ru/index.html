@@ -6,16 +6,26 @@
   <title>Зелёные насаждения</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #f0f4f0; padding: 12px; color: #1e293b; }
-    .container { max-width: 900px; margin: 0 auto; background: #fff; border-radius: 20px; padding: 16px; box-shadow: 0 2px 10px rgba(0,0,0,.05); }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: #f0f4f0; padding: 12px; color: #1e293b;
+    }
+    .container {
+      max-width: 900px; margin: 0 auto; background: #fff;
+      border-radius: 20px; padding: 16px; box-shadow: 0 2px 10px rgba(0,0,0,.05);
+    }
     header { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
     h1 { font-size: 22px; font-weight: 700; }
     .address-selector { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
-    .address-btn { background: #e2e8f0; border: none; padding: 12px 20px; border-radius: 30px; font-size: 16px; cursor: pointer; transition: 0.2s; font-weight: 500; }
+    .address-btn {
+      background: #e2e8f0; border: none; padding: 12px 20px; border-radius: 30px;
+      font-size: 16px; cursor: pointer; transition: 0.2s; font-weight: 500;
+    }
     .address-btn.active { background: #2d6a4f; color: white; }
     .search-wrapper { display: flex; align-items: center; background: #f1f5f9; border-radius: 30px; padding: 6px 16px; }
     .search-wrapper input { border: none; outline: none; background: transparent; font-size: 16px; padding: 10px 0; width: 100%; }
     .stats { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px; color: #475569; }
+
     .table-container { overflow-x: auto; border-radius: 14px; border: 1px solid #e2e8f0; }
     table { width: 100%; border-collapse: collapse; min-width: 650px; }
     thead th { background: #2d6a4f; color: white; font-weight: 600; font-size: 14px; padding: 12px 10px; text-align: left; position: sticky; top: 0; }
@@ -25,15 +35,31 @@
     tbody tr.removed { background: #fee2e2; }
     .badge-removed { background: #dc2626; color: white; padding: 2px 10px; border-radius: 20px; font-size: 12px; }
 
+    /* Мобильные карточки */
     @media (max-width: 700px) {
       body { padding: 8px; }
       .container { padding: 12px; }
       .table-container { border: none; overflow-x: visible; }
       table, thead, tbody, th, td, tr { display: block; }
       thead { display: none; }
-      tbody tr { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; margin-bottom: 10px; padding: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
-      tbody td { display: flex; justify-content: space-between; padding: 8px 10px; border: none; font-size: 15px; line-height: 1.4; }
-      tbody td::before { content: attr(data-label); font-weight: 600; color: #475569; margin-right: 10px; min-width: 90px; }
+      table { min-width: 0; }
+      tbody tr {
+        background: #fff; border: 1px solid #e2e8f0; border-radius: 14px;
+        margin-bottom: 10px; padding: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.04);
+      }
+      tbody td {
+        display: flex; justify-content: space-between; padding: 8px 10px;
+        border: none; font-size: 15px; line-height: 1.4;
+      }
+      tbody td::before {
+        content: attr(data-label); font-weight: 600; color: #475569; margin-right: 10px; min-width: 90px;
+      }
+      .address-selector { justify-content: center; }
+      .address-btn { font-size: 15px; padding: 10px 18px; }
+    }
+
+    @media (max-width: 400px) {
+      h1 { font-size: 20px; }
     }
 
     .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,.6); backdrop-filter: blur(2px); }
@@ -94,8 +120,10 @@
 </div>
 
 <script>
-  const API_URL = 'https://script.google.com/macros/s/AKfycbw-NhebKDeAcMr5pcz4inUX1Jn_RN-rlMuVJdCsUEV32LSYLLCZ9noQs0sn15XMLmFIwg/exec';
+  // ========== НАСТРОЙКИ ==========
+  const API_URL = 'https://script.google.com/macros/s/AKfycbxhwm5UYAHNQ0Hc-scbuFdWcF6ogPoKJ7tbyS7FwR7ZJPY3N3oMq77mqmY6QHAgFbM/exec';
 
+  // ========== ПЕРЕМЕННЫЕ ==========
   let addresses = [];
   let currentAddress = null;
   let allTrees = [];
@@ -116,6 +144,7 @@
   const uploadBtn = $('uploadBtn');
   const statusDiv = $('status');
 
+  // ========== ЗАГРУЗКА АДРЕСОВ ==========
   async function loadAddresses() {
     try {
       const resp = await fetch(API_URL + '?action=addresses');
@@ -127,6 +156,7 @@
         await loadTrees();
       }
     } catch (err) {
+      console.error('Адреса:', err);
       tableBody.innerHTML = '<tr><td colspan="6" class="error">Ошибка загрузки адресов</td></tr>';
     }
   }
@@ -143,24 +173,25 @@
     currentAddressSpan.textContent = currentAddress || '';
   }
 
+  // ========== ЗАГРУЗКА ДЕРЕВЬЕВ ==========
   async function loadTrees() {
     try {
-      const resp = await fetch(`${API_URL}?action=list&address=${encodeURIComponent(currentAddress)}`);
+      const url = `${API_URL}?action=list&address=${encodeURIComponent(currentAddress)}`;
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
       const data = await resp.json();
-      allTrees = (Array.isArray(data) ? data : []).sort((a, b) => (parseInt(a['Номер растения']) || 0) - (parseInt(b['Номер растения']) || 0));
+      allTrees = Array.isArray(data) ? data.sort((a, b) => (parseInt(a['Номер растения'])||0) - (parseInt(b['Номер растения'])||0)) : [];
       updateStats(allTrees);
       renderTable(allTrees);
     } catch (err) {
+      console.error('Деревья:', err);
       tableBody.innerHTML = '<tr><td colspan="6" class="error">Ошибка загрузки данных</td></tr>';
     }
   }
 
   function renderTable(rows) {
     tableBody.innerHTML = '';
-    if (!rows.length) {
-      tableBody.innerHTML = '<tr><td colspan="6">Нет данных</td></tr>';
-      return;
-    }
+    if (!rows.length) { tableBody.innerHTML = '<tr><td colspan="6">Нет данных</td></tr>'; return; }
     rows.forEach(tree => {
       const tr = document.createElement('tr');
       tr.innerHTML = `
@@ -192,6 +223,7 @@
     updateStats(filtered);
   });
 
+  // ========== МОДАЛЬНОЕ ОКНО ==========
   function openModal(tree) {
     currentUid = tree.UID;
     modalTitle.textContent = `${tree['Вид растения'] || 'Растение'} №${tree['Номер растения'] || ''}`;
@@ -217,6 +249,7 @@
   modalClose.onclick = () => modal.style.display = 'none';
   window.onclick = e => { if (e.target === modal) modal.style.display = 'none'; };
 
+  // ========== ОТПРАВКА ФОТО ==========
   function fileToBase64(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -231,7 +264,7 @@
     statusDiv.textContent = '⏳ Сохраняем...';
     statusDiv.className = '';
 
-    // 1. Обновление статуса удаления
+    // 1. Обновляем статус удаления
     try {
       const params = new URLSearchParams({ action: 'updateRemove', address: currentAddress, uid: currentUid, remove: removeCheck.checked });
       const resp = await fetch(API_URL, { method: 'POST', body: params });
@@ -242,30 +275,33 @@
         return;
       }
     } catch (err) {
-      statusDiv.textContent = '❌ Сетевая ошибка';
+      statusDiv.textContent = '❌ Сетевая ошибка (статус)';
       statusDiv.className = 'error';
       return;
     }
 
-    // 2. Загрузка фото
+    // 2. Загружаем фото, если выбраны
     const fileInputs = ['photo1','photo2','photo3','photo4'].map(id => $(id));
     const files = fileInputs.filter(inp => inp.files.length > 0).map(inp => inp.files[0]);
+
     if (files.length > 0) {
       try {
-        const base64Strings = await Promise.all(files.map(fileToBase64));
+        const base64Array = await Promise.all(files.map(fileToBase64));
         const url = `${API_URL}?action=uploadPhotos&address=${encodeURIComponent(currentAddress)}&uid=${currentUid}`;
         const response = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ photos: base64Strings })
+          body: JSON.stringify({ photos: base64Array })
         });
         const result = await response.json();
+        console.log('Ответ сервера:', result);
         if (result.error) {
           statusDiv.textContent = '❌ Ошибка фото: ' + result.error;
           statusDiv.className = 'error';
           return;
         }
       } catch (err) {
+        console.error('Ошибка загрузки фото:', err);
         statusDiv.textContent = '❌ Ошибка обработки фото';
         statusDiv.className = 'error';
         return;
@@ -278,6 +314,7 @@
     setTimeout(() => { statusDiv.textContent = ''; statusDiv.className = ''; }, 2000);
   });
 
+  // ========== СТАРТ ==========
   loadAddresses();
 </script>
 </body>
