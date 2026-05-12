@@ -1,465 +1,201 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Инвентаризация зелёных насаждений</title>
-    <style>
-        body { font-family: Arial, sans-serif; background: #f5f5f5; margin: 0; padding: 20px; }
-        #plan-container { position: relative; display: inline-block; border: 2px solid #333; line-height: 0; }
-        #plan-img { max-width: 100%; height: auto; display: block; }
-        .tree-marker {
-            position: absolute; width: 20px; height: 20px;
-            background: rgba(0, 128, 0, 0.85); border: 2px solid white;
-            border-radius: 50%; transform: translate(-50%, -50%);
-            cursor: pointer; z-index: 10; transition: 0.2s;
-            display: flex; align-items: center; justify-content: center;
-            color: white; font-size: 10px; font-weight: bold;
-            user-select: none;
-        }
-        .tree-marker.dragging { opacity: 0.7; background: orange; }
-        .tree-marker.removed { background: rgba(255, 0, 0, 0.8); }
-        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0;
-            width: 100%; height: 100%; background: rgba(0,0,0,0.6); }
-        .modal-content { background: white; margin: 3% auto; padding: 20px;
-            width: 90%; max-width: 500px; border-radius: 8px; position: relative; }
-        .close { position: absolute; right: 15px; top: 10px; font-size: 28px;
-            font-weight: bold; cursor: pointer; }
-        .tree-info p { margin: 5px 0; }
-        .tree-info label { font-weight: bold; display: inline-block; width: 180px; }
-        .btn { background: #4CAF50; color: white; border: none; padding: 8px 16px;
-            border-radius: 5px; cursor: pointer; margin: 5px; }
-        .btn:hover { opacity: 0.9; }
-        #photo-preview { max-width: 200px; max-height: 200px; margin-top: 10px; display: block; }
-        #controls { margin: 15px 0; padding: 10px; background: #eef; border-radius: 5px; display: inline-block; }
-        #status { margin-left: 10px; color: green; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ведомость зелёных насаждений</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background: #f9f9f9; }
+    h2 { color: #2c3e50; }
+    #search { margin: 10px 0; padding: 8px; width: 300px; font-size: 16px; }
+    #table-container { max-height: 70vh; overflow-y: auto; border: 1px solid #ccc; margin-top: 10px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
+    th { background: #4CAF50; color: white; position: sticky; top: 0; }
+    tr { cursor: pointer; }
+    tr:hover { background: #f1f1f1; }
+    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.6); }
+    .modal-content { background: white; margin: 3% auto; padding: 20px; width: 90%; max-width: 500px;
+      border-radius: 8px; position: relative; }
+    .close { position: absolute; right: 15px; top: 10px; font-size: 28px; font-weight: bold; cursor: pointer; }
+    .detail-row { margin: 5px 0; }
+    .detail-row label { font-weight: bold; display: inline-block; width: 180px; }
+    .photo-section { margin-top: 15px; }
+    .photo-section input[type="file"] { margin: 5px 0; }
+    .btn { background: #4CAF50; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
+    .btn:hover { opacity: 0.9; }
+    #status { margin-top: 10px; }
+    .removed-row { background: #ffdddd; }
+  </style>
 </head>
 <body>
-    <h2>План зелёных насаждений</h2>
-    <div id="controls">
-        <button class="btn" id="dragModeBtn">Включить перемещение</button>
-        <button class="btn" id="computeCalibBtn" disabled>Вычислить калибровку</button>
-        <button class="btn" id="saveCalibBtn" disabled>Сохранить калибровку</button>
-        <span id="status"></span>
-        <br><small>Для калибровки: включите режим, перетащите несколько маркеров в правильные места, затем нажмите "Вычислить"</small>
+  <h2>🌳 Ведомость зелёных насаждений (Красная Пахра)</h2>
+  <input type="text" id="search" placeholder="Поиск по виду, номеру, состоянию...">
+  <div id="table-container">
+    <table id="treeTable">
+      <thead>
+        <tr>
+          <th>№ растения</th>
+          <th>Вид</th>
+          <th>Диаметр</th>
+          <th>Высота</th>
+          <th>Состояние</th>
+          <th>Удаление</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+
+  <!-- Модальное окно -->
+  <div id="treeModal" class="modal">
+    <div class="modal-content">
+      <span class="close" id="modalClose">&times;</span>
+      <h3 id="modalTitle"></h3>
+      <div id="treeDetails"></div>
+      <div style="margin: 15px 0;">
+        <input type="checkbox" id="removeCheck"> <label for="removeCheck">Пометить на удаление</label>
+      </div>
+      <div class="photo-section">
+        <p><strong>Загрузить фотографии (до 4)</strong></p>
+        <input type="file" accept="image/*" capture="environment" id="photo1"><br>
+        <input type="file" accept="image/*" capture="environment" id="photo2"><br>
+        <input type="file" accept="image/*" capture="environment" id="photo3"><br>
+        <input type="file" accept="image/*" capture="environment" id="photo4"><br>
+        <button class="btn" id="uploadBtn">Сохранить изменения</button>
+      </div>
+      <div id="status"></div>
     </div>
+  </div>
 
-    <div id="plan-container">
-        <img id="plan-img" src="plan.jpg" alt="План территории">
-    </div>
+  <script>
+    const API_URL = 'https://script.google.com/macros/s/AKfycbx26lgGuN4C804XpnuStcjrsP4-u5ej4jgjzFUNTTZGXKeWh8btdsLSLOJWnwGCfsrS2w/exec'; // ← замените на свой URL Apps Script
 
-    <!-- Модальное окно -->
-    <div id="treeModal" class="modal">
-        <div class="modal-content">
-            <span class="close" id="modalClose">&times;</span>
-            <h3 id="treeTitle"></h3>
-            <div id="treeData" class="tree-info"></div>
-            <div style="margin:10px 0;">
-                <input type="checkbox" id="removeCheck"> <label for="removeCheck">Пометить на удаление</label>
-            </div>
-            <div>
-                <input type="file" id="photoInput" accept="image/*" capture="environment">
-                <button class="btn" id="uploadBtn">Загрузить фото</button>
-            </div>
-            <img id="photo-preview" src="" alt="Фото" style="display:none;">
-            <div id="statusMsg" style="margin-top:10px;"></div>
-        </div>
-    </div>
+    let trees = [];
+    let currentUid = null;
 
-    <script src="trees.js"></script>
-    <script>
-        // ---------- НАСТРОЙКИ ----------
-        const API_URL = 'https://script.google.com/macros/s/AKfycby9TMK0ewD9-YXPthheFn26KmtISA08caEV68bx4-VNCNpN7roHAfwLCmJjDr9BEJ4cHg/exec'; // ★ замените на свой URL
+    const tableBody = document.getElementById('tableBody');
+    const searchInput = document.getElementById('search');
+    const modal = document.getElementById('treeModal');
+    const modalClose = document.getElementById('modalClose');
+    const modalTitle = document.getElementById('modalTitle');
+    const treeDetails = document.getElementById('treeDetails');
+    const removeCheck = document.getElementById('removeCheck');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const statusDiv = document.getElementById('status');
 
-        // ---------- ПЕРЕМЕННЫЕ ----------
-        const img = document.getElementById('plan-img');
-        const container = document.getElementById('plan-container');
-        const dragModeBtn = document.getElementById('dragModeBtn');
-        const computeCalibBtn = document.getElementById('computeCalibBtn');
-        const saveCalibBtn = document.getElementById('saveCalibBtn');
-        const statusSpan = document.getElementById('status');
+    // Загрузка данных
+    async function loadTrees() {
+      try {
+        const resp = await fetch(API_URL + '?action=list');
+        trees = await resp.json();
+        renderTable(trees);
+      } catch (err) {
+        tableBody.innerHTML = '<tr><td colspan="6">Ошибка загрузки данных</td></tr>';
+        console.error(err);
+      }
+    }
 
-        let markers = [];              // DOM-элементы маркеров
-        let markerDataMap = new Map(); // DOM -> объект из treesRaw
-        let isDragMode = false;
-        let draggedMarker = null;
-        let dragOffsetX = 0, dragOffsetY = 0;
-        let calibratedTransform = null; // { offsetX, offsetY, scaleX, scaleY } или null
-
-        // Загружаем сохранённую калибровку
-        try {
-            const saved = localStorage.getItem('treeCalibrationSimple');
-            if (saved) {
-                calibratedTransform = JSON.parse(saved);
-                statusSpan.textContent = 'Загружена сохранённая калибровка';
-            }
-        } catch(e) {}
-
-        // ---------- ФУНКЦИИ ----------
-        function placeMarkers() {
-            if (!treesRaw || treesRaw.length === 0) return;
-            const imgW = img.clientWidth;
-            const imgH = img.clientHeight;
-            if (imgW === 0 || imgH === 0) return;
-
-            // Очищаем старые маркеры
-            container.querySelectorAll('.tree-marker').forEach(el => el.remove());
-            markers = [];
-            markerDataMap.clear();
-
-            // Вычисляем границы исходных координат
-            let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
-            treesRaw.forEach(t => {
-                if (t.x_raw < xMin) xMin = t.x_raw;
-                if (t.x_raw > xMax) xMax = t.x_raw;
-                if (t.y_raw < yMin) yMin = t.y_raw;
-                if (t.y_raw > yMax) yMax = t.y_raw;
-            });
-            const dx = xMax - xMin;
-            const dy = yMax - yMin;
-
-            treesRaw.forEach((t, index) => {
-                // Нормализованные координаты [0,1]
-                const nx = (t.x_raw - xMin) / dx;
-                const ny = (t.y_raw - yMin) / dy;
-
-                let px = nx * imgW;
-                let py = ny * imgH;
-
-                // Применяем калибровку, если есть
-                if (calibratedTransform) {
-                    px = nx * imgW * calibratedTransform.scaleX + calibratedTransform.offsetX;
-                    py = ny * imgH * calibratedTransform.scaleY + calibratedTransform.offsetY;
-                }
-
-                const dot = document.createElement('div');
-                dot.className = 'tree-marker';
-                dot.textContent = t.numPlant || (t.id ? t.id.slice(-3) : index+1);
-                dot.style.left = px + 'px';
-                dot.style.top = py + 'px';
-                dot.dataset.uid = t.uid;
-                dot.addEventListener('click', (e) => {
-                    if (!isDragMode) openModal(t.uid);
-                });
-                // drag events
-                dot.addEventListener('mousedown', onMouseDown);
-                dot.addEventListener('touchstart', onTouchStart, {passive: false});
-                container.appendChild(dot);
-                markers.push(dot);
-                markerDataMap.set(dot, t);
-            });
+    function renderTable(data) {
+      tableBody.innerHTML = '';
+      if (!Array.isArray(data) || data.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="6">Нет данных</td></tr>';
+        return;
+      }
+      data.forEach(tree => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${tree['Номер растения'] || ''}</td>
+          <td>${tree['Вид растения'] || ''}</td>
+          <td>${tree['Диаметр'] || ''}</td>
+          <td>${tree['Высота'] || ''}</td>
+          <td>${tree['Состояние'] || ''}</td>
+          <td>${tree['Remove'] === true || tree['Remove'] === 'TRUE' ? '✔️' : ''}</td>
+        `;
+        tr.addEventListener('click', () => openModal(tree));
+        if (tree['Remove'] === true || tree['Remove'] === 'TRUE') {
+          tr.classList.add('removed-row');
         }
+        tableBody.appendChild(tr);
+      });
+    }
 
-        // ---------- DRAG AND DROP ----------
-        function onMouseDown(e) {
-            if (!isDragMode) return;
-            e.preventDefault();
-            draggedMarker = e.currentTarget;
-            draggedMarker.classList.add('dragging');
-            const rect = draggedMarker.getBoundingClientRect();
-            dragOffsetX = e.clientX - rect.left;
-            dragOffsetY = e.clientY - rect.top;
-            document.addEventListener('mousemove', onMouseMove);
-            document.addEventListener('mouseup', onMouseUp);
+    // Поиск
+    searchInput.addEventListener('input', () => {
+      const query = searchInput.value.toLowerCase();
+      const filtered = trees.filter(tree => {
+        const fields = [tree['Номер растения'], tree['Вид растения'], tree['Состояние'], tree['Характеристика состояния'], tree['Рекомендации по уходу']];
+        return fields.some(f => (f || '').toString().toLowerCase().includes(query));
+      });
+      renderTable(filtered);
+    });
+
+    // Модальное окно
+    function openModal(tree) {
+      currentUid = tree.UID;
+      modalTitle.textContent = `${tree['Вид растения'] || 'Растение'} №${tree['Номер растения'] || ''}`;
+      treeDetails.innerHTML = `
+        <div class="detail-row"><label>Вид:</label> ${tree['Вид растения'] || '-'}</div>
+        <div class="detail-row"><label>Форма:</label> ${tree['Жизненная форма'] || '-'}</div>
+        <div class="detail-row"><label>Диаметр:</label> ${tree['Диаметр'] || '-'} см</div>
+        <div class="detail-row"><label>Высота:</label> ${tree['Высота'] || '-'} м</div>
+        <div class="detail-row"><label>Возраст:</label> ${tree['Возраст'] || '-'} лет</div>
+        <div class="detail-row"><label>Состояние:</label> ${tree['Состояние'] || '-'}</div>
+        <div class="detail-row"><label>Описание:</label> ${tree['Характеристика состояния'] || '-'}</div>
+        <div class="detail-row"><label>Рекомендации:</label> ${tree['Рекомендации по уходу'] || '-'}</div>
+      `;
+      removeCheck.checked = (tree.Remove === true || tree.Remove === 'TRUE');
+      // Очищаем поля файлов
+      document.getElementById('photo1').value = '';
+      document.getElementById('photo2').value = '';
+      document.getElementById('photo3').value = '';
+      document.getElementById('photo4').value = '';
+      statusDiv.textContent = '';
+      modal.style.display = 'block';
+    }
+
+    modalClose.onclick = () => modal.style.display = 'none';
+    window.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
+
+    // Сохранение
+    uploadBtn.addEventListener('click', async () => {
+      if (!currentUid) return;
+      statusDiv.textContent = 'Сохранение...';
+
+      // Обновление статуса удаления
+      const removeBody = new URLSearchParams({
+        action: 'updateRemove',
+        uid: currentUid,
+        remove: removeCheck.checked
+      });
+      await fetch(API_URL, { method: 'POST', body: removeBody });
+
+      // Загрузка фото
+      const formData = new FormData();
+      formData.append('action', 'uploadPhotos');
+      formData.append('uid', currentUid);
+      let hasFiles = false;
+      for (let i = 1; i <= 4; i++) {
+        const fileInput = document.getElementById('photo' + i);
+        if (fileInput.files.length > 0) {
+          formData.append('photo' + (i-1), fileInput.files[0]); // нумерация с 0 для скрипта
+          hasFiles = true;
         }
+      }
 
-        function onMouseMove(e) {
-            if (!draggedMarker) return;
-            const containerRect = container.getBoundingClientRect();
-            let x = e.clientX - containerRect.left - dragOffsetX + draggedMarker.offsetWidth/2;
-            let y = e.clientY - containerRect.top - dragOffsetY + draggedMarker.offsetHeight/2;
-            // ограничения
-            x = Math.max(0, Math.min(x, container.clientWidth - draggedMarker.offsetWidth));
-            y = Math.max(0, Math.min(y, container.clientHeight - draggedMarker.offsetHeight));
-            draggedMarker.style.left = x + 'px';
-            draggedMarker.style.top = y + 'px';
-        }
+      if (hasFiles) {
+        await fetch(API_URL, { method: 'POST', body: formData });
+      }
 
-        function onMouseUp(e) {
-            if (!draggedMarker) return;
-            draggedMarker.classList.remove('dragging');
-            document.removeEventListener('mousemove', onMouseMove);
-            document.removeEventListener('mouseup', onMouseUp);
-            draggedMarker = null;
-            // Активируем кнопки
-            computeCalibBtn.disabled = false;
-            saveCalibBtn.disabled = true; // пока не вычислено
-        }
+      statusDiv.textContent = 'Сохранено!';
+      // Обновляем таблицу
+      await loadTrees();
+      setTimeout(() => { statusDiv.textContent = ''; }, 2000);
+    });
 
-        function onTouchStart(e) {
-            if (!isDragMode) return;
-            e.preventDefault();
-            const touch = e.touches[0];
-            draggedMarker = e.currentTarget;
-            draggedMarker.classList.add('dragging');
-            const rect = draggedMarker.getBoundingClientRect();
-            dragOffsetX = touch.clientX - rect.left;
-            dragOffsetY = touch.clientY - rect.top;
-            document.addEventListener('touchmove', onTouchMove, {passive: false});
-            document.addEventListener('touchend', onTouchEnd);
-        }
-
-        function onTouchMove(e) {
-            if (!draggedMarker) return;
-            e.preventDefault();
-            const touch = e.touches[0];
-            const containerRect = container.getBoundingClientRect();
-            let x = touch.clientX - containerRect.left - dragOffsetX + draggedMarker.offsetWidth/2;
-            let y = touch.clientY - containerRect.top - dragOffsetY + draggedMarker.offsetHeight/2;
-            x = Math.max(0, Math.min(x, container.clientWidth - draggedMarker.offsetWidth));
-            y = Math.max(0, Math.min(y, container.clientHeight - draggedMarker.offsetHeight));
-            draggedMarker.style.left = x + 'px';
-            draggedMarker.style.top = y + 'px';
-        }
-
-        function onTouchEnd(e) {
-            if (!draggedMarker) return;
-            draggedMarker.classList.remove('dragging');
-            document.removeEventListener('touchmove', onTouchMove);
-            document.removeEventListener('touchend', onTouchEnd);
-            draggedMarker = null;
-            computeCalibBtn.disabled = false;
-            saveCalibBtn.disabled = true;
-        }
-
-        // ---------- КАЛИБРОВКА ----------
-        function computeCalibration() {
-            // Собираем маркеры, которые были передвинуты (их текущее положение отличается от начального)
-            // Нам нужны хотя бы 2 точки для вычисления сдвига и масштаба
-            const movedMarkers = markers.filter(m => {
-                // Сравниваем с исходной позицией, которая была бы без калибровки
-                // Мы не хранили исходную, но можем восстановить из данных
-                const data = markerDataMap.get(m);
-                if (!data) return false;
-                // Исходная позиция без калибровки
-                const imgW = img.clientWidth;
-                const imgH = img.clientHeight;
-                const xMin = Math.min(...treesRaw.map(t=>t.x_raw));
-                const xMax = Math.max(...treesRaw.map(t=>t.x_raw));
-                const yMin = Math.min(...treesRaw.map(t=>t.y_raw));
-                const yMax = Math.max(...treesRaw.map(t=>t.y_raw));
-                const dx = xMax - xMin;
-                const dy = yMax - yMin;
-                const nx = (data.x_raw - xMin) / dx;
-                const ny = (data.y_raw - yMin) / dy;
-                const origX = nx * imgW;
-                const origY = ny * imgH;
-                const currX = parseFloat(m.style.left);
-                const currY = parseFloat(m.style.top);
-                // Если разница больше 2 пикселей, считаем передвинутым
-                return Math.abs(currX - origX) > 2 || Math.abs(currY - origY) > 2;
-            });
-
-            if (movedMarkers.length < 2) {
-                statusSpan.textContent = 'Нужно передвинуть минимум 2 маркера';
-                return;
-            }
-
-            // Для простоты предполагаем только сдвиг и равномерный масштаб
-            // Используем метод наименьших квадратов для преобразования: new_x = scale * orig_x + offset_x
-            // Для X и Y независимо
-            const points = movedMarkers.map(m => {
-                const data = markerDataMap.get(m);
-                const imgW = img.clientWidth;
-                const imgH = img.clientHeight;
-                const xMin = Math.min(...treesRaw.map(t=>t.x_raw));
-                const xMax = Math.max(...treesRaw.map(t=>t.x_raw));
-                const yMin = Math.min(...treesRaw.map(t=>t.y_raw));
-                const yMax = Math.max(...treesRaw.map(t=>t.y_raw));
-                const dx = xMax - xMin;
-                const dy = yMax - yMin;
-                const nx = (data.x_raw - xMin) / dx;
-                const ny = (data.y_raw - yMin) / dy;
-                const origX = nx * imgW;
-                const origY = ny * imgH;
-                const newX = parseFloat(m.style.left);
-                const newY = parseFloat(m.style.top);
-                return { origX, origY, newX, newY };
-            });
-
-            // Вычисляем scale и offset по X
-            let sumX = 0, sumOrigX = 0, sumXorigX = 0, sumOrigX2 = 0;
-            points.forEach(p => {
-                sumX += p.newX;
-                sumOrigX += p.origX;
-                sumXorigX += p.origX * p.newX;
-                sumOrigX2 += p.origX * p.origX;
-            });
-            const n = points.length;
-            const scaleX = (n * sumXorigX - sumOrigX * sumX) / (n * sumOrigX2 - sumOrigX * sumOrigX);
-            const offsetX = (sumX - scaleX * sumOrigX) / n;
-
-            // Для Y
-            let sumY = 0, sumOrigY = 0, sumYorigY = 0, sumOrigY2 = 0;
-            points.forEach(p => {
-                sumY += p.newY;
-                sumOrigY += p.origY;
-                sumYorigY += p.origY * p.newY;
-                sumOrigY2 += p.origY * p.origY;
-            });
-            const scaleY = (n * sumYorigY - sumOrigY * sumY) / (n * sumOrigY2 - sumOrigY * sumOrigY);
-            const offsetY = (sumY - scaleY * sumOrigY) / n;
-
-            calibratedTransform = {
-                scaleX: scaleX,
-                offsetX: offsetX,
-                scaleY: scaleY,
-                offsetY: offsetY
-            };
-
-            // Применяем ко всем маркерам
-            applyTransformToAll();
-            computeCalibBtn.disabled = true;
-            saveCalibBtn.disabled = false;
-            statusSpan.textContent = 'Калибровка вычислена и применена';
-        }
-
-        function applyTransformToAll() {
-            if (!calibratedTransform) return;
-            const imgW = img.clientWidth;
-            const imgH = img.clientHeight;
-            const xMin = Math.min(...treesRaw.map(t=>t.x_raw));
-            const xMax = Math.max(...treesRaw.map(t=>t.x_raw));
-            const yMin = Math.min(...treesRaw.map(t=>t.y_raw));
-            const yMax = Math.max(...treesRaw.map(t=>t.y_raw));
-            const dx = xMax - xMin;
-            const dy = yMax - yMin;
-
-            markers.forEach(m => {
-                const data = markerDataMap.get(m);
-                if (!data) return;
-                const nx = (data.x_raw - xMin) / dx;
-                const ny = (data.y_raw - yMin) / dy;
-                const origX = nx * imgW;
-                const origY = ny * imgH;
-                const newX = origX * calibratedTransform.scaleX + calibratedTransform.offsetX;
-                const newY = origY * calibratedTransform.scaleY + calibratedTransform.offsetY;
-                m.style.left = newX + 'px';
-                m.style.top = newY + 'px';
-            });
-        }
-
-        // Переключение режима
-        dragModeBtn.addEventListener('click', () => {
-            isDragMode = !isDragMode;
-            dragModeBtn.textContent = isDragMode ? 'Выключить перемещение' : 'Включить перемещение';
-            dragModeBtn.style.background = isDragMode ? '#f44336' : '#4CAF50';
-            // Меняем курсор
-            if (isDragMode) {
-                img.style.cursor = 'default';
-                markers.forEach(m => m.style.cursor = 'move');
-            } else {
-                img.style.cursor = 'crosshair';
-                markers.forEach(m => m.style.cursor = 'pointer');
-            }
-        });
-
-        computeCalibBtn.addEventListener('click', computeCalibration);
-        saveCalibBtn.addEventListener('click', () => {
-            if (calibratedTransform) {
-                localStorage.setItem('treeCalibrationSimple', JSON.stringify(calibratedTransform));
-                statusSpan.textContent = 'Калибровка сохранена в браузере';
-                saveCalibBtn.disabled = true;
-            }
-        });
-
-        // ---------- МОДАЛЬНОЕ ОКНО (без изменений) ----------
-        const modal = document.getElementById('treeModal');
-        const modalClose = document.getElementById('modalClose');
-        const treeTitle = document.getElementById('treeTitle');
-        const treeDataDiv = document.getElementById('treeData');
-        const removeCheck = document.getElementById('removeCheck');
-        const photoInput = document.getElementById('photoInput');
-        const uploadBtn = document.getElementById('uploadBtn');
-        const photoPreview = document.getElementById('photo-preview');
-        const statusMsg = document.getElementById('statusMsg');
-
-        let currentUid = null;
-
-        async function openModal(uid) {
-            currentUid = uid;
-            statusMsg.textContent = '';
-            removeCheck.checked = false;
-            photoPreview.style.display = 'none';
-            treeDataDiv.innerHTML = 'Загрузка...';
-            modal.style.display = 'block';
-            try {
-                const resp = await fetch(API_URL + '?uid=' + uid);
-                const data = await resp.json();
-                if (data.error) {
-                    treeDataDiv.innerHTML = '<p style="color:red;">' + data.error + '</p>';
-                    return;
-                }
-                const fields = [
-                    ['Номер растения', 'Номер растения'],
-                    ['Вид растения', 'Вид растения'],
-                    ['Жизненная форма', 'Жизненная форма'],
-                    ['Тип насаждения', 'Тип насаждения'],
-                    ['Диаметр', 'Диаметр'],
-                    ['Высота', 'Высота'],
-                    ['Возраст', 'Возраст'],
-                    ['Состояние', 'Состояние'],
-                    ['Характеристика состояния', 'Характеристика состояния'],
-                    ['Рекомендации по уходу', 'Рекомендации по уходу'],
-                    ['Особо ценное', 'Особо ценное']
-                ];
-                let html = '';
-                fields.forEach(([key, label]) => {
-                    if (data[key] !== undefined && data[key] !== '') {
-                        html += '<p><label>' + label + ':</label> ' + data[key] + '</p>';
-                    }
-                });
-                treeTitle.textContent = (data['Вид растения'] || 'Растение') + ' (ID ' + (data['ID'] || '') + ')';
-                treeDataDiv.innerHTML = html;
-                removeCheck.checked = (data['Remove'] === true || data['Remove'] === 'TRUE');
-                if (data['PhotoURL']) {
-                    photoPreview.src = data['PhotoURL'];
-                    photoPreview.style.display = 'block';
-                }
-            } catch (err) {
-                treeDataDiv.innerHTML = '<p style="color:red;">Ошибка связи</p>';
-            }
-        }
-
-        removeCheck.addEventListener('change', async () => {
-            if (!currentUid) return;
-            const body = new URLSearchParams({ action: 'updateRemove', uid: currentUid, remove: removeCheck.checked });
-            const resp = await fetch(API_URL, { method: 'POST', body });
-            const result = await resp.json();
-            statusMsg.textContent = result.success ? 'Статус обновлён' : 'Ошибка: ' + result.error;
-            const dot = document.querySelector('.tree-marker[data-uid="' + currentUid + '"]');
-            if (dot) dot.classList.toggle('removed', removeCheck.checked);
-        });
-
-        uploadBtn.addEventListener('click', async () => {
-            if (!currentUid) return;
-            const file = photoInput.files[0];
-            if (!file) { statusMsg.textContent = 'Выберите файл'; return; }
-            statusMsg.textContent = 'Загрузка...';
-            const formData = new FormData();
-            formData.append('action', 'uploadPhoto');
-            formData.append('uid', currentUid);
-            formData.append('photo', file);
-            const resp = await fetch(API_URL, { method: 'POST', body: formData });
-            const result = await resp.json();
-            if (result.success) {
-                photoPreview.src = result.photoUrl;
-                photoPreview.style.display = 'block';
-                statusMsg.textContent = 'Фото загружено';
-                photoInput.value = '';
-            } else {
-                statusMsg.textContent = 'Ошибка: ' + result.error;
-            }
-        });
-
-        modalClose.onclick = () => modal.style.display = 'none';
-        window.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
-
-        // ---------- ЗАПУСК ----------
-        img.addEventListener('load', placeMarkers);
-        if (img.complete) placeMarkers();
-        window.addEventListener('resize', placeMarkers);
-    </script>
+    // Запуск
+    loadTrees();
+  </script>
 </body>
 </html>
