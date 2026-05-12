@@ -3,284 +3,135 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-  <title>Зелёные насаждения</title>
+  <title>Зелёные насаждения (диагностика)</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      background: #f0f4f0; padding: 12px; color: #1e293b;
-    }
-    .container { max-width: 900px; margin: 0 auto; background: #fff; border-radius: 20px; padding: 16px; box-shadow: 0 2px 10px rgba(0,0,0,.05); }
-    header { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
-    h1 { font-size: 22px; font-weight: 700; }
-    .address-selector { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
-    .address-btn {
-      background: #e2e8f0; border: none; padding: 12px 20px; border-radius: 30px;
-      font-size: 16px; cursor: pointer; transition: 0.2s; font-weight: 500;
-    }
+    body { font-family: sans-serif; padding: 20px; background: #f0f4f0; }
+    .container { max-width: 900px; margin: auto; background: white; border-radius: 20px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    h1 { margin-top: 0; }
+    .address-selector { display: flex; flex-wrap: wrap; gap: 10px; margin: 15px 0; }
+    .address-btn { padding: 12px 20px; border-radius: 30px; background: #e2e8f0; border: none; cursor: pointer; font-weight: 500; }
     .address-btn.active { background: #2d6a4f; color: white; }
-    .search-wrapper { display: flex; align-items: center; background: #f1f5f9; border-radius: 30px; padding: 6px 16px; }
-    .search-wrapper input { border: none; outline: none; background: transparent; font-size: 16px; padding: 10px 0; width: 100%; }
-    .stats { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px; color: #475569; }
-    .table-container { overflow-x: auto; border-radius: 14px; border: 1px solid #e2e8f0; }
-    table { width: 100%; border-collapse: collapse; min-width: 650px; }
-    thead th { background: #2d6a4f; color: white; font-weight: 600; font-size: 14px; padding: 12px 10px; text-align: left; position: sticky; top: 0; }
-    tbody td { padding: 12px 10px; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
-    tbody tr { cursor: pointer; transition: background 0.15s; }
-    tbody tr:hover { background: #f0fdf4; }
-    tbody tr.removed { background: #fee2e2; }
+    .stats { display: flex; gap: 20px; margin-bottom: 15px; color: #444; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 10px; text-align: left; border-bottom: 1px solid #eee; }
+    th { background: #2d6a4f; color: white; }
+    tr:hover { background: #f0fdf4; }
     .badge-removed { background: #dc2626; color: white; padding: 2px 10px; border-radius: 20px; font-size: 12px; }
-    @media (max-width: 700px) {
-      .table-container { border: none; overflow-x: visible; }
-      table, thead, tbody, th, td, tr { display: block; }
-      thead { display: none; }
-      tbody tr { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; margin-bottom: 10px; padding: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
-      tbody td { display: flex; justify-content: space-between; padding: 8px 10px; border: none; font-size: 15px; line-height: 1.4; }
-      tbody td::before { content: attr(data-label); font-weight: 600; color: #475569; margin-right: 10px; min-width: 90px; }
-    }
-    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,.6); backdrop-filter: blur(2px); }
-    .modal-content { background: white; margin: 5% auto; padding: 20px; width: 94%; max-width: 500px; border-radius: 20px; position: relative; max-height: 85vh; overflow-y: auto; }
-    .close { position: absolute; right: 16px; top: 12px; font-size: 28px; color: #666; cursor: pointer; }
-    .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 16px 0; }
-    .detail-item { background: #f8fafc; border-radius: 10px; padding: 10px; }
-    .detail-item label { font-size: 12px; color: #64748b; display: block; margin-bottom: 2px; }
-    .detail-item span { font-weight: 600; }
-    .photo-section { border-top: 2px solid #e2e8f0; padding-top: 16px; margin-top: 12px; }
-    .photo-section input[type="file"] { display: block; margin-bottom: 12px; padding: 10px; width: 100%; border: 1px dashed #cbd5e1; border-radius: 10px; background: #fafafa; font-size: 15px; }
-    .btn { background: #2d6a4f; color: white; border: none; padding: 14px 24px; border-radius: 40px; font-size: 16px; font-weight: 600; cursor: pointer; width: 100%; transition: 0.2s; }
-    .btn:hover { background: #1b4332; }
-    #status { margin-top: 10px; text-align: center; font-weight: 500; }
-    .error { color: #dc2626; }
-    .success { color: #2d6a4f; }
+    .error { color: red; }
+    #debug { background: #f8f8f8; border: 1px solid #ccc; padding: 10px; margin: 15px 0; white-space: pre-wrap; display: none; }
   </style>
 </head>
 <body>
 <div class="container">
-  <header>
-    <h1>🌳 Зелёные насаждения</h1>
-    <div class="address-selector" id="addressSelector"></div>
-    <div class="search-wrapper">
-      <input type="text" id="search" placeholder="Поиск...">
-    </div>
-  </header>
+  <h1>🌳 Зелёные насаждения</h1>
+  <div id="debug"></div>
+  <div class="address-selector" id="addressSelector"></div>
   <div class="stats">
-    <span>Адрес: <strong id="currentAddress"></strong></span>
+    <span>Адрес: <strong id="currentAddress">—</strong></span>
     <span>Всего: <strong id="totalCount">0</strong></span>
     <span>На удаление: <strong id="removedCount">0</strong></span>
   </div>
-  <div class="table-container">
-    <table>
-      <thead><tr><th>№</th><th>Вид</th><th>Диаметр</th><th>Высота</th><th>Состояние</th><th>Статус</th></tr></thead>
-      <tbody id="tableBody"></tbody>
-    </table>
-  </div>
-</div>
-
-<div id="treeModal" class="modal">
-  <div class="modal-content">
-    <span class="close" id="modalClose">&times;</span>
-    <h3 id="modalTitle"></h3>
-    <div id="treeDetails" class="detail-grid"></div>
-    <div style="margin:16px 0;display:flex;align-items:center;gap:8px;">
-      <input type="checkbox" id="removeCheck" style="width:22px;height:22px;">
-      <label for="removeCheck">Пометить на удаление</label>
-    </div>
-    <div class="photo-section">
-      <p><strong>📸 Фотографии (до 4)</strong></p>
-      <input type="file" accept="image/*" id="photo1">
-      <input type="file" accept="image/*" id="photo2">
-      <input type="file" accept="image/*" id="photo3">
-      <input type="file" accept="image/*" id="photo4">
-      <button class="btn" id="uploadBtn">Сохранить изменения</button>
-      <div id="status"></div>
-    </div>
-  </div>
+  <input type="text" id="search" placeholder="Поиск..." style="padding:10px;width:100%;border-radius:30px;border:1px solid #ccc;margin-bottom:15px;">
+  <table>
+    <thead><tr><th>№</th><th>Вид</th><th>Диаметр</th><th>Высота</th><th>Состояние</th><th>Статус</th></tr></thead>
+    <tbody id="tableBody"><tr><td colspan="6">Загрузка...</td></tr></tbody>
+  </table>
 </div>
 
 <script>
-  const API_URL = 'https://script.google.com/macros/s/AKfycbxXF0HPPltenHApjSJPxN_az1Nlf5HkwEmqrDyS9hj37ykVI0YK7PzVh1KqG4p3d0vFNA/exec; // ← подставьте свой URL
+  const API_URL = 'https://script.google.com/macros/s/AKfycbxXF0HPPltenHApjSJPxN_az1Nlf5HkwEmqrDyS9hj37ykVI0YK7PzVh1KqG4p3d0vFNA/exec'; // ← замените на свой URL
 
   let addresses = [];
   let currentAddress = null;
-  let allTrees = [];
-  let currentUid = null;
 
-  const addressSelector = document.getElementById('addressSelector');
-  const currentAddressSpan = document.getElementById('currentAddress');
-  const tableBody = document.getElementById('tableBody');
-  const searchInput = document.getElementById('search');
-  const totalSpan = document.getElementById('totalCount');
-  const removedSpan = document.getElementById('removedCount');
-  const modal = document.getElementById('treeModal');
-  const modalClose = document.getElementById('modalClose');
-  const modalTitle = document.getElementById('modalTitle');
-  const treeDetails = document.getElementById('treeDetails');
-  const removeCheck = document.getElementById('removeCheck');
-  const uploadBtn = document.getElementById('uploadBtn');
-  const statusDiv = document.getElementById('status');
+  function log(msg) {
+    const dbg = document.getElementById('debug');
+    dbg.style.display = 'block';
+    dbg.textContent += msg + '\n';
+    console.log(msg);
+  }
 
   async function loadAddresses() {
+    log('Запрашиваем адреса: ' + API_URL + '?action=addresses');
     try {
-      const resp = await fetch(`${API_URL}?action=addresses`);
-      addresses = await resp.json();
+      const resp = await fetch(API_URL + '?action=addresses');
+      log('Статус ответа: ' + resp.status);
+      if (!resp.ok) {
+        log('Ошибка HTTP: ' + resp.status + ' ' + resp.statusText);
+        document.getElementById('tableBody').innerHTML = '<tr><td colspan="6" class="error">Ошибка загрузки адресов (см. лог)</td></tr>';
+        return;
+      }
+      const data = await resp.json();
+      log('Получены адреса: ' + JSON.stringify(data));
+      addresses = data;
       if (addresses.length > 0) {
         currentAddress = addresses[0];
-        buildAddressButtons();
-        await loadTrees();
+        buildButtons();
+        loadTrees();
+      } else {
+        log('Список адресов пуст. Проверьте таблицу.');
+        document.getElementById('tableBody').innerHTML = '<tr><td colspan="6" class="error">Нет листов с данными</td></tr>';
       }
     } catch (err) {
-      console.error('Ошибка загрузки адресов', err);
+      log('Ошибка: ' + err.message);
+      document.getElementById('tableBody').innerHTML = '<tr><td colspan="6" class="error">Ошибка сети или скрипта</td></tr>';
     }
   }
 
-  function buildAddressButtons() {
-    addressSelector.innerHTML = '';
-    addresses.forEach(addr => {
+  function buildButtons() {
+    const sel = document.getElementById('addressSelector');
+    sel.innerHTML = '';
+    addresses.forEach(a => {
       const btn = document.createElement('button');
-      btn.className = 'address-btn';
-      btn.textContent = addr;
-      if (addr === currentAddress) btn.classList.add('active');
-      btn.addEventListener('click', () => switchAddress(addr));
-      addressSelector.appendChild(btn);
+      btn.className = 'address-btn' + (a === currentAddress ? ' active' : '');
+      btn.textContent = a;
+      btn.onclick = () => { currentAddress = a; buildButtons(); loadTrees(); };
+      sel.appendChild(btn);
     });
-    currentAddressSpan.textContent = currentAddress;
-  }
-
-  async function switchAddress(addr) {
-    currentAddress = addr;
-    buildAddressButtons();
-    await loadTrees();
+    document.getElementById('currentAddress').textContent = currentAddress || '—';
   }
 
   async function loadTrees() {
+    document.getElementById('tableBody').innerHTML = '<tr><td colspan="6">Загрузка...</td></tr>';
+    const url = API_URL + '?action=list&address=' + encodeURIComponent(currentAddress);
+    log('Загружаем деревья: ' + url);
     try {
-      const resp = await fetch(`${API_URL}?action=list&address=${encodeURIComponent(currentAddress)}`);
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
       const data = await resp.json();
-      allTrees = (Array.isArray(data) ? data : []).sort((a, b) => {
-        const na = parseInt(a['Номер растения']) || 0;
-        const nb = parseInt(b['Номер растения']) || 0;
-        return na - nb;
-      });
-      updateStats(allTrees);
+      log('Получено растений: ' + data.length);
+      allTrees = Array.isArray(data) ? data.sort((a,b) => (parseInt(a['Номер растения'])||0) - (parseInt(b['Номер растения'])||0)) : [];
       renderTable(allTrees);
     } catch (err) {
-      tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:red;">Ошибка загрузки</td></tr>';
+      log('Ошибка загрузки деревьев: ' + err.message);
+      document.getElementById('tableBody').innerHTML = '<tr><td colspan="6" class="error">Ошибка загрузки данных</td></tr>';
     }
   }
 
+  let allTrees = [];
   function renderTable(rows) {
-    tableBody.innerHTML = '';
-    if (!rows.length) {
-      tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;">Нет данных</td></tr>';
-      return;
-    }
-    rows.forEach(tree => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td data-label="№ растения"><strong>${tree['Номер растения'] || ''}</strong></td>
-        <td data-label="Вид">${tree['Вид растения'] || ''}</td>
-        <td data-label="Диаметр">${tree['Диаметр'] || ''}</td>
-        <td data-label="Высота">${tree['Высота'] || ''}</td>
-        <td data-label="Состояние">${tree['Состояние'] || ''}</td>
-        <td data-label="Статус">${(tree.Remove === true || tree.Remove === 'TRUE') ? '<span class="badge-removed">Удалить</span>' : ''}</td>
-      `;
-      tr.addEventListener('click', () => openModal(tree));
-      if (tree.Remove === true || tree.Remove === 'TRUE') tr.classList.add('removed');
-      tableBody.appendChild(tr);
-    });
+    const tbody = document.getElementById('tableBody');
+    if (!rows.length) { tbody.innerHTML = '<tr><td colspan="6">Нет данных</td></tr>'; return; }
+    tbody.innerHTML = rows.map(t => `
+      <tr>
+        <td>${t['Номер растения'] || ''}</td>
+        <td>${t['Вид растения'] || ''}</td>
+        <td>${t['Диаметр'] || ''}</td>
+        <td>${t['Высота'] || ''}</td>
+        <td>${t['Состояние'] || ''}</td>
+        <td>${(t.Remove === true || t.Remove === 'TRUE') ? '<span class="badge-removed">Удалить</span>' : ''}</td>
+      </tr>
+    `).join('');
+    document.getElementById('totalCount').textContent = rows.length;
+    document.getElementById('removedCount').textContent = rows.filter(r => r.Remove === true || r.Remove === 'TRUE').length;
   }
 
-  function updateStats(rows) {
-    totalSpan.textContent = rows.length;
-    removedSpan.textContent = rows.filter(r => r.Remove === true || r.Remove === 'TRUE').length;
-  }
-
-  searchInput.addEventListener('input', () => {
-    const q = searchInput.value.toLowerCase().trim();
-    const filtered = q ? allTrees.filter(tree =>
-      ['Номер растения','Вид растения','Состояние','Характеристика состояния','Рекомендации по уходу']
-        .some(f => (tree[f] || '').toString().toLowerCase().includes(q))
-    ) : [...allTrees];
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.toLowerCase();
+    const filtered = q ? allTrees.filter(t => 
+      ['Номер растения','Вид растения','Состояние'].some(f => (t[f]||'').toLowerCase().includes(q))
+    ) : allTrees;
     renderTable(filtered);
-    updateStats(filtered);
-  });
-
-  function openModal(tree) {
-    currentUid = tree.UID;
-    modalTitle.textContent = `${tree['Вид растения'] || 'Растение'} №${tree['Номер растения'] || ''}`;
-    treeDetails.innerHTML = `
-      <div class="detail-item"><label>Вид</label><span>${tree['Вид растения'] || '-'}</span></div>
-      <div class="detail-item"><label>Форма</label><span>${tree['Жизненная форма'] || '-'}</span></div>
-      <div class="detail-item"><label>Диаметр</label><span>${tree['Диаметр'] || '-'} см</span></div>
-      <div class="detail-item"><label>Высота</label><span>${tree['Высота'] || '-'} м</span></div>
-      <div class="detail-item"><label>Возраст</label><span>${tree['Возраст'] || '-'} лет</span></div>
-      <div class="detail-item"><label>Состояние</label><span>${tree['Состояние'] || '-'}</span></div>
-      <div class="detail-item" style="grid-column: span 2;"><label>Описание</label><span>${tree['Характеристика состояния'] || '-'}</span></div>
-      <div class="detail-item" style="grid-column: span 2;"><label>Рекомендации</label><span>${tree['Рекомендации по уходу'] || '-'}</span></div>
-    `;
-    removeCheck.checked = (tree.Remove === true || tree.Remove === 'TRUE');
-    document.getElementById('photo1').value = '';
-    document.getElementById('photo2').value = '';
-    document.getElementById('photo3').value = '';
-    document.getElementById('photo4').value = '';
-    statusDiv.textContent = '';
-    modal.style.display = 'block';
-  }
-
-  modalClose.onclick = () => modal.style.display = 'none';
-  window.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
-
-  function fileToBase64(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  }
-
-  uploadBtn.addEventListener('click', async () => {
-    if (!currentUid) return;
-    statusDiv.textContent = '⏳ Сохраняем...';
-    statusDiv.className = '';
-
-    try {
-      const params = new URLSearchParams({ action: 'updateRemove', address: currentAddress, uid: currentUid, remove: removeCheck.checked });
-      await fetch(API_URL, { method: 'POST', body: params });
-    } catch (err) {
-      statusDiv.textContent = '❌ Ошибка статуса';
-      statusDiv.className = 'error';
-      return;
-    }
-
-    const fileInputs = [document.getElementById('photo1'), document.getElementById('photo2'), document.getElementById('photo3'), document.getElementById('photo4')];
-    const files = fileInputs.filter(inp => inp.files.length > 0).map(inp => inp.files[0]);
-
-    if (files.length > 0) {
-      try {
-        const base64Strings = await Promise.all(files.map(fileToBase64));
-        const response = await fetch(API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'uploadPhotos', address: currentAddress, uid: currentUid, photos: base64Strings })
-        });
-        const result = await response.json();
-        if (result.error) {
-          statusDiv.textContent = '❌ Ошибка фото: ' + result.error;
-          statusDiv.className = 'error';
-          return;
-        }
-      } catch (err) {
-        statusDiv.textContent = '❌ Ошибка обработки фото';
-        statusDiv.className = 'error';
-        return;
-      }
-    }
-
-    statusDiv.textContent = '✅ Сохранено!';
-    statusDiv.className = 'success';
-    await loadTrees();
-    setTimeout(() => { statusDiv.textContent = ''; statusDiv.className = ''; }, 2000);
   });
 
   loadAddresses();
