@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-  <title>Зелёные насаждения — Красная Пахра</title>
+  <title>Зелёные насаждения</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -12,88 +12,33 @@
       padding: 12px;
       color: #1e293b;
     }
-    .container {
-      max-width: 900px;
-      margin: 0 auto;
-      background: #ffffff;
-      border-radius: 20px;
-      padding: 16px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    .container { max-width: 900px; margin: 0 auto; background: #fff; border-radius: 20px; padding: 16px; box-shadow: 0 2px 10px rgba(0,0,0,.05); }
+    header { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
+    h1 { font-size: 22px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .address-selector { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+    .address-btn {
+      background: #e2e8f0; border: none; padding: 12px 20px; border-radius: 30px;
+      font-size: 16px; cursor: pointer; transition: 0.2s; font-weight: 500;
     }
-    header {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      margin-bottom: 16px;
-    }
-    h1 {
-      font-size: 22px;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
+    .address-btn.active { background: #2d6a4f; color: white; }
     .search-wrapper {
-      display: flex;
-      align-items: center;
-      background: #f1f5f9;
-      border-radius: 30px;
-      padding: 6px 16px;
+      display: flex; align-items: center; background: #f1f5f9; border-radius: 30px; padding: 6px 16px;
     }
     .search-wrapper input {
-      border: none;
-      outline: none;
-      background: transparent;
-      font-size: 16px;
-      padding: 10px 0;
-      width: 100%;
+      border: none; outline: none; background: transparent; font-size: 16px; padding: 10px 0; width: 100%;
     }
-    .stats {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 12px;
-      font-size: 14px;
-      color: #475569;
-    }
-    .table-container {
-      overflow-x: auto;
-      border-radius: 14px;
-      border: 1px solid #e2e8f0;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      min-width: 650px;
-      display: table;
-    }
+    .stats { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px; color: #475569; }
+    .table-container { overflow-x: auto; border-radius: 14px; border: 1px solid #e2e8f0; }
+    table { width: 100%; border-collapse: collapse; min-width: 650px; display: table; }
     thead th {
-      background: #2d6a4f;
-      color: white;
-      font-weight: 600;
-      font-size: 14px;
-      padding: 12px 10px;
-      text-align: left;
-      position: sticky;
-      top: 0;
+      background: #2d6a4f; color: white; font-weight: 600; font-size: 14px;
+      padding: 12px 10px; text-align: left; position: sticky; top: 0;
     }
-    tbody td {
-      padding: 12px 10px;
-      border-bottom: 1px solid #f1f5f9;
-      font-size: 14px;
-    }
-    tbody tr {
-      cursor: pointer;
-      transition: background 0.15s;
-    }
+    tbody td { padding: 12px 10px; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+    tbody tr { cursor: pointer; transition: background 0.15s; }
     tbody tr:hover { background: #f0fdf4; }
     tbody tr.removed { background: #fee2e2; }
-    .badge-removed {
-      background: #dc2626;
-      color: white;
-      padding: 2px 10px;
-      border-radius: 20px;
-      font-size: 12px;
-    }
+    .badge-removed { background: #dc2626; color: white; padding: 2px 10px; border-radius: 20px; font-size: 12px; }
 
     @media (max-width: 700px) {
       .table-container { border: none; overflow-x: visible; }
@@ -101,103 +46,40 @@
       thead { display: none; }
       table { min-width: 0; }
       tbody tr {
-        background: #fff;
-        border: 1px solid #e2e8f0;
-        border-radius: 14px;
-        margin-bottom: 10px;
-        padding: 8px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        background: #fff; border: 1px solid #e2e8f0; border-radius: 14px;
+        margin-bottom: 10px; padding: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.04);
       }
       tbody td {
-        display: flex;
-        justify-content: space-between;
-        padding: 8px 10px;
-        border: none;
-        font-size: 15px;
-        line-height: 1.4;
+        display: flex; justify-content: space-between; padding: 8px 10px;
+        border: none; font-size: 15px; line-height: 1.4;
       }
       tbody td::before {
-        content: attr(data-label);
-        font-weight: 600;
-        color: #475569;
-        margin-right: 10px;
-        min-width: 90px;
+        content: attr(data-label); font-weight: 600; color: #475569;
+        margin-right: 10px; min-width: 90px;
       }
-    }
-
-    @media (max-width: 400px) {
-      body { padding: 8px; }
-      .container { padding: 12px; }
-      h1 { font-size: 20px; }
     }
 
     .modal {
-      display: none;
-      position: fixed;
-      z-index: 1000;
-      left: 0; top: 0;
-      width: 100%; height: 100%;
-      background: rgba(0,0,0,0.6);
-      backdrop-filter: blur(2px);
+      display: none; position: fixed; z-index: 1000; left: 0; top: 0;
+      width: 100%; height: 100%; background: rgba(0,0,0,.6); backdrop-filter: blur(2px);
     }
     .modal-content {
-      background: white;
-      margin: 5% auto;
-      padding: 20px;
-      width: 94%;
-      max-width: 500px;
-      border-radius: 20px;
-      position: relative;
-      max-height: 85vh;
-      overflow-y: auto;
+      background: white; margin: 5% auto; padding: 20px; width: 94%; max-width: 500px;
+      border-radius: 20px; position: relative; max-height: 85vh; overflow-y: auto;
     }
-    .close {
-      position: absolute;
-      right: 16px;
-      top: 12px;
-      font-size: 28px;
-      color: #666;
-      cursor: pointer;
-    }
-    .detail-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin: 16px 0;
-    }
-    .detail-item {
-      background: #f8fafc;
-      border-radius: 10px;
-      padding: 10px;
-    }
+    .close { position: absolute; right: 16px; top: 12px; font-size: 28px; color: #666; cursor: pointer; }
+    .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 16px 0; }
+    .detail-item { background: #f8fafc; border-radius: 10px; padding: 10px; }
     .detail-item label { font-size: 12px; color: #64748b; display: block; margin-bottom: 2px; }
     .detail-item span { font-weight: 600; }
-    .photo-section {
-      border-top: 2px solid #e2e8f0;
-      padding-top: 16px;
-      margin-top: 12px;
-    }
+    .photo-section { border-top: 2px solid #e2e8f0; padding-top: 16px; margin-top: 12px; }
     .photo-section input[type="file"] {
-      display: block;
-      margin-bottom: 12px;
-      padding: 10px;
-      width: 100%;
-      border: 1px dashed #cbd5e1;
-      border-radius: 10px;
-      background: #fafafa;
-      font-size: 15px;
+      display: block; margin-bottom: 12px; padding: 10px; width: 100%;
+      border: 1px dashed #cbd5e1; border-radius: 10px; background: #fafafa; font-size: 15px;
     }
     .btn {
-      background: #2d6a4f;
-      color: white;
-      border: none;
-      padding: 14px 24px;
-      border-radius: 40px;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      width: 100%;
-      transition: background 0.2s;
+      background: #2d6a4f; color: white; border: none; padding: 14px 24px;
+      border-radius: 40px; font-size: 16px; font-weight: 600; cursor: pointer; width: 100%; transition: 0.2s;
     }
     .btn:hover { background: #1b4332; }
     #status { margin-top: 10px; text-align: center; font-weight: 500; }
@@ -208,12 +90,14 @@
 <body>
 <div class="container">
   <header>
-    <h1>🌳 Зелёные насаждения <small style="font-weight:400;opacity:0.7;margin-left:8px;">Красная Пахра</small></h1>
+    <h1>🌳 Зелёные насаждения</h1>
+    <div class="address-selector" id="addressSelector"></div>
     <div class="search-wrapper">
       <input type="text" id="search" placeholder="Поиск...">
     </div>
   </header>
   <div class="stats">
+    <span>Адрес: <strong id="currentAddress"></strong></span>
     <span>Всего: <strong id="totalCount">0</strong></span>
     <span>На удаление: <strong id="removedCount">0</strong></span>
   </div>
@@ -225,6 +109,7 @@
   </div>
 </div>
 
+<!-- Модальное окно -->
 <div id="treeModal" class="modal">
   <div class="modal-content">
     <span class="close" id="modalClose">&times;</span>
@@ -247,11 +132,17 @@
 </div>
 
 <script>
-  const API_URL = 'https://script.google.com/macros/s/AKfycbzmB6drMFPTSpuuLVK5tDTE6C5vMSxhq5RHTQqU4Xlo-4KacWT9ymtKJLoMw57En4wfYA/exec;
+  const API_URL = 'https://script.google.com/macros/s/AKfycbwT6TJZzpSj0LVheBOoLpIB7YIsdmuBJmyAE7uNiamXaoMbk61WQcpWoCrbx1tFHx-3jQ/exec; // ← замените на URL веб-приложения после развёртывания
 
+  // Точные названия вкладок из вашей таблицы
+  const ADDRESSES = ['Д01', 'Д02', 'Д03', 'Д04-5', 'Д06', 'Ш02', 'Ш03'];
+
+  let currentAddress = ADDRESSES[0];
   let allTrees = [];
   let currentUid = null;
 
+  const addressSelector = document.getElementById('addressSelector');
+  const currentAddressSpan = document.getElementById('currentAddress');
   const tableBody = document.getElementById('tableBody');
   const searchInput = document.getElementById('search');
   const totalSpan = document.getElementById('totalCount');
@@ -264,9 +155,28 @@
   const uploadBtn = document.getElementById('uploadBtn');
   const statusDiv = document.getElementById('status');
 
+  function buildAddressButtons() {
+    addressSelector.innerHTML = '';
+    ADDRESSES.forEach(addr => {
+      const btn = document.createElement('button');
+      btn.className = 'address-btn';
+      btn.textContent = addr;
+      if (addr === currentAddress) btn.classList.add('active');
+      btn.addEventListener('click', () => switchAddress(addr));
+      addressSelector.appendChild(btn);
+    });
+    currentAddressSpan.textContent = currentAddress;
+  }
+
+  async function switchAddress(addr) {
+    currentAddress = addr;
+    buildAddressButtons();
+    await loadTrees();
+  }
+
   async function loadTrees() {
     try {
-      const resp = await fetch(API_URL + '?action=list');
+      const resp = await fetch(`${API_URL}?action=list&address=${encodeURIComponent(currentAddress)}`);
       const data = await resp.json();
       allTrees = (Array.isArray(data) ? data : []).sort((a, b) => {
         const na = parseInt(a['Номер растения']) || 0;
@@ -342,7 +252,6 @@
   modalClose.onclick = () => modal.style.display = 'none';
   window.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
 
-  // Преобразует File в base64 строку (data:image/jpeg;base64,...)
   function fileToBase64(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -357,17 +266,20 @@
     statusDiv.textContent = '⏳ Сохраняем...';
     statusDiv.className = '';
 
-    // 1. Обновление статуса удаления
     try {
-      const removeBody = new URLSearchParams({ action: 'updateRemove', uid: currentUid, remove: removeCheck.checked });
-      await fetch(API_URL, { method: 'POST', body: removeBody });
+      const params = new URLSearchParams({
+        action: 'updateRemove',
+        address: currentAddress,
+        uid: currentUid,
+        remove: removeCheck.checked
+      });
+      await fetch(API_URL, { method: 'POST', body: params });
     } catch (err) {
       statusDiv.textContent = '❌ Ошибка статуса';
       statusDiv.className = 'error';
       return;
     }
 
-    // 2. Сбор и загрузка фото
     const fileInputs = [
       document.getElementById('photo1'),
       document.getElementById('photo2'),
@@ -378,20 +290,17 @@
 
     if (files.length > 0) {
       try {
-        // Преобразуем все файлы в base64
         const base64Strings = await Promise.all(files.map(fileToBase64));
-
-        // Отправляем JSON
         const response = await fetch(API_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             action: 'uploadPhotos',
+            address: currentAddress,
             uid: currentUid,
             photos: base64Strings
           })
         });
-
         const result = await response.json();
         if (result.error) {
           statusDiv.textContent = '❌ Ошибка фото: ' + result.error;
@@ -414,6 +323,7 @@
     }, 2000);
   });
 
+  buildAddressButtons();
   loadTrees();
 </script>
 </body>
