@@ -5,120 +5,41 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Инвентаризация зелёных насаждений</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background: #f5f5f5;
-            margin: 0;
-            padding: 20px;
-        }
-        #plan-container {
-            position: relative;
-            display: inline-block;
-            border: 2px solid #333;
-            line-height: 0;
-        }
-        #plan-img {
-            max-width: 100%;
-            height: auto;
-            display: block;
-        }
+        body { font-family: Arial, sans-serif; background: #f5f5f5; margin: 0; padding: 20px; }
+        #plan-container { position: relative; display: inline-block; border: 2px solid #333; line-height: 0; }
+        #plan-img { max-width: 100%; height: auto; display: block; }
         .tree-marker {
-            position: absolute;
-            width: 18px;
-            height: 18px;
-            background: rgba(0, 128, 0, 0.85);
-            border: 2px solid white;
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            cursor: pointer;
-            z-index: 10;
-            transition: 0.2s;
+            position: absolute; width: 18px; height: 18px;
+            background: rgba(0, 128, 0, 0.85); border: 2px solid white;
+            border-radius: 50%; transform: translate(-50%, -50%);
+            cursor: pointer; z-index: 10; transition: 0.2s;
         }
-        .tree-marker:hover {
-            background: red;
-            width: 22px;
-            height: 22px;
-        }
-        .tree-marker.removed {
-            background: rgba(255, 0, 0, 0.8);
-        }
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.6);
-        }
-        .modal-content {
-            background: white;
-            margin: 3% auto;
-            padding: 20px;
-            width: 90%;
-            max-width: 500px;
-            border-radius: 8px;
-            position: relative;
-        }
-        .close {
-            position: absolute;
-            right: 15px;
-            top: 10px;
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-        .tree-info p {
-            margin: 5px 0;
-        }
-        .tree-info label {
-            font-weight: bold;
-            display: inline-block;
-            width: 180px;
-        }
-        .btn {
-            background: #4CAF50;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            margin: 5px;
-        }
-        .btn:hover {
-            opacity: 0.9;
-        }
-        #photo-preview {
-            max-width: 200px;
-            max-height: 200px;
-            margin-top: 10px;
-            display: block;
-        }
-        #calibration {
-            margin: 15px 0;
-            padding: 10px;
-            background: #eef;
-            border-radius: 5px;
-            display: inline-block;
-        }
-        #calibration label {
-            display: inline-block;
-            width: 80px;
-            margin-right: 10px;
-        }
-        #calibration input {
-            width: 70px;
-            margin-right: 15px;
-        }
+        .tree-marker:hover { background: red; width: 22px; height: 22px; }
+        .tree-marker.removed { background: rgba(255, 0, 0, 0.8); }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0;
+            width: 100%; height: 100%; background: rgba(0,0,0,0.6); }
+        .modal-content { background: white; margin: 3% auto; padding: 20px;
+            width: 90%; max-width: 500px; border-radius: 8px; position: relative; }
+        .close { position: absolute; right: 15px; top: 10px; font-size: 28px;
+            font-weight: bold; cursor: pointer; }
+        .tree-info p { margin: 5px 0; }
+        .tree-info label { font-weight: bold; display: inline-block; width: 180px; }
+        .btn { background: #4CAF50; color: white; border: none; padding: 10px 20px;
+            border-radius: 5px; cursor: pointer; margin: 5px; }
+        .btn:hover { opacity: 0.9; }
+        #photo-preview { max-width: 200px; max-height: 200px; margin-top: 10px; display: block; }
+        #calibration { margin: 15px 0; padding: 10px; background: #eef; border-radius: 5px; display: inline-block; }
+        #calibration label { display: inline-block; width: 80px; margin-right: 10px; }
+        #calibration input { width: 70px; margin-right: 15px; }
     </style>
 </head>
 <body>
     <h2>План зелёных насаждений</h2>
     <p>Нажмите на маркер, чтобы увидеть данные, отметить удаление или загрузить фото.</p>
 
-    <div id="calibration" style="display:none;">
-        <strong>Калибровка (изменяйте, пока метки не встанут на место):</strong><br>
+    <!-- Панель калибровки (всегда видна) -->
+    <div id="calibration">
+        <strong>Калибровка маркеров:</strong><br>
         <label>Смещение X:</label><input type="number" id="offsetX" value="0" step="1">
         <label>Смещение Y:</label><input type="number" id="offsetY" value="0" step="1"><br>
         <label>Масштаб X:</label><input type="number" id="scaleX" value="1" step="0.01">
@@ -153,9 +74,9 @@
     <script src="trees.js"></script>
     <script>
         // ---------- НАСТРОЙКИ ----------
-        const API_URL = 'https://script.google.com/macros/s/AKfycby9TMK0ewD9-YXPthheFn26KmtISA08caEV68bx4-VNCNpN7roHAfwLCmJjDr9BEJ4cHg/exec'; // ★ замените на свой URL
+        const API_URL = 'ВАШ_API_URL'; // ★ замените на свой URL
 
-        // ---------- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ----------
+        // ---------- ЛОГИКА ----------
         const img = document.getElementById('plan-img');
         const container = document.getElementById('plan-container');
         const modal = document.getElementById('treeModal');
@@ -171,7 +92,7 @@
         let currentUid = null;
         let calibration = { offsetX: 0, offsetY: 0, scaleX: 1, scaleY: 1 };
 
-        // Пытаемся загрузить сохранённую калибровку
+        // Загружаем сохранённую калибровку, если есть
         try {
             const saved = localStorage.getItem('treeCalibration');
             if (saved) {
@@ -183,17 +104,14 @@
             }
         } catch (e) {}
 
-        // ---------- ФУНКЦИИ МАРКЕРОВ ----------
         function placeMarkers() {
             if (!treesRaw || treesRaw.length === 0) return;
             const imgW = img.clientWidth;
             const imgH = img.clientHeight;
             if (imgW === 0 || imgH === 0) return;
 
-            // удаляем старые маркеры
             container.querySelectorAll('.tree-marker').forEach(el => el.remove());
 
-            // границы исходных координат
             let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
             treesRaw.forEach(t => {
                 if (t.x_raw < xMin) xMin = t.x_raw;
@@ -205,10 +123,8 @@
             const dy = yMax - yMin;
 
             treesRaw.forEach(t => {
-                // нормализованные координаты [0..1]
                 const nx = (t.x_raw - xMin) / dx;
                 const ny = (t.y_raw - yMin) / dy;
-                // применяем калибровку
                 const px = nx * imgW * calibration.scaleX + calibration.offsetX;
                 const py = ny * imgH * calibration.scaleY + calibration.offsetY;
 
@@ -243,9 +159,6 @@
             document.getElementById('savedMsg').textContent = 'Сохранено!';
             setTimeout(() => { document.getElementById('savedMsg').textContent = ''; }, 2000);
         });
-
-        // Показать панель калибровки (можно спрятать, когда настроено)
-        document.getElementById('calibration').style.display = 'inline-block';
 
         // ---------- МОДАЛЬНОЕ ОКНО ----------
         async function openModal(uid) {
